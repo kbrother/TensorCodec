@@ -1,0 +1,109 @@
+import numpy as np
+import argparse
+import torch
+from tqdm import tqdm
+import math
+import sys
+from model import NeuKron_TT
+from data import _mat
+import copy
+
+def train_model(n_model, args):
+    device = torch.device("cuda:" + str(args.device[0]))
+    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
+    max_fit = sys.float_info.min
+    n_model.model.train()
+    for epoch in range(args.epoch):
+        optimizer.zero_grad()
+        prev_loss = n_model.L2_loss(True, args.batch_size)
+        opt_state_dict = copy.deepcopy(optimizer.state_dict())
+        prev_model = copy.deepcopy(n_model.model.state_dict())
+        optimizer.step()        
+        prev_fit = 1 - math.sqrt(prev_loss) / n_model.input_mat.norm   
+        
+        with open(args.save_path + ".txt", 'a') as lossfile:
+            lossfile.write(f'epoch:{epoch}, train loss: {prev_fit}\n')    
+            print(f'epoch:{epoch}, train loss: {prev_fit}\n')
+            
+        if max_fit < prev_fit:
+            max_fit = prev_fit
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': prev_model,
+                'optimizer_state_dict': opt_state_dict,
+                'loss': prev_loss
+            }, args.save_path + ".pt")
+                
+
+# python main.py train -d hsi -m 2 10 -n 2 9 3 1 -de 1 2 3 -rk 5 -hs 40 -sp results/hsi/test -e 200
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('action', type=str, help='train')
+    parser.add_argument("-d", "--dataset", type=str)   
+    
+    parser.add_argument(
+        "-n", "--n_comp",
+        action="store", nargs='+', type=int
+    )
+    
+    parser.add_argument(
+        "-m", "--m_comp",
+        action="store", nargs='+', type=int
+    )
+    
+    parser.add_argument(
+        "-de", "--device",
+        action="store", nargs='+', type=int
+    )    
+    
+    parser.add_argument(
+        "-rk", "--rank",
+        action="store", default=12, type=int
+    )
+    
+    parser.add_argument(
+        "-lr", "--lr",
+        action="store", default=1e-3, type=float
+    )
+    
+    parser.add_argument(
+        "-e", "--epoch",
+        action="store", default=20000, type=int
+    )
+    
+    parser.add_argument(
+        "-b", "--batch_size",
+        action="store", default=2**15, type=int
+    )
+    
+    parser.add_argument(
+        "-sp", "--save_path",
+        action="store", default="./params/", type=str
+    )
+    
+    parser.add_argument(
+        "-hs", "--hidden_size",
+        action="store", default=11, type=int
+    )
+    
+    args = parser.parse_args()      
+    # decompsress m_list and n_list
+    _cnt = 0
+    m_list = []
+    while _cnt < len(args.m_comp):
+        m_list = m_list + [args.m_comp[_cnt] for _ in range(args.m_comp[_cnt + 1])]
+        _cnt += 2
+    _cnt = 0
+    n_list = []
+    while _cnt < len(args.n_comp):
+        n_list = n_list + [args.n_comp[_cnt] for _ in range(args.n_comp[_cnt + 1])]
+        _cnt += 2    
+                
+    num_row, num_col = 1, 1
+    for m in m_list: num_row *= m
+    for n in n_list: num_col *= n
+    input_mat = _mat("../data/" + args.dataset + "_mat.npy", num_row, num_col)
+
+    n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
+    if args.action == "train":
+        train_model(n_model, args)
