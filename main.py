@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import math
 import sys
-from model import NeuKron_TT
+from model import NeuKron_TT, TT
 from data import _mat
 import copy
 
@@ -35,7 +35,9 @@ def train_model(n_model, args):
             }, args.save_path + ".pt")
                 
 
-# python main.py train -d hsi -m 2 10 -n 2 9 3 1 -de 1 2 3 -rk 5 -hs 40 -sp results/hsi/test -e 200
+# python main.py train -d gms5 -m 2 9 -n 2 9 -de 1 2 3 -rk 20 -hs 20 -sp results/gms5/rk20_hs20 -e 200
+# python main.py check_tt -d gms5 -m 2 9 -n 2 9 -de 0 
+# python main.py train -d hsi -m 2 10 -n 2 9 3 1 -de 1 2 3 -rk 30 -hs 10 -sp results/hsi/rk40_hs10 -e 200
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')
@@ -73,7 +75,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-b", "--batch_size",
-        action="store", default=2**15, type=int
+        action="store", default=2**14, type=int
     )
     
     parser.add_argument(
@@ -103,7 +105,11 @@ if __name__ == '__main__':
     for m in m_list: num_row *= m
     for n in n_list: num_col *= n
     input_mat = _mat("../data/" + args.dataset + "_mat.npy", num_row, num_col)
-
-    n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
+    
     if args.action == "train":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
         train_model(n_model, args)
+    elif args.action == "check_tt":
+        tt_model = TT(input_mat, args.rank, m_list, n_list, args.device[0], args.dataset)
+        print(f'norm: {input_mat.norm}')
+        print(f'fitness: {tt_model.fitness(args.batch_size)}')

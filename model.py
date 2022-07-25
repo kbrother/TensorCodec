@@ -1,6 +1,8 @@
 from torch import nn
 import torch
 from tqdm import tqdm
+import math
+import numpy as np
 
 # Model
 class rnn_model(torch.nn.Module):
@@ -10,7 +12,7 @@ class rnn_model(torch.nn.Module):
     '''
     def __init__(self, rank, m_list, n_list, hidden_size):
         super(rnn_model, self).__init__()
-        self.rank = rank
+        self.rank = rankz
         self.k = len(n_list)
         self.linear_first = nn.Linear(hidden_size, rank)
         self.linear_final = nn.Linear(hidden_size, rank)
@@ -26,7 +28,6 @@ class rnn_model(torch.nn.Module):
             num_emb += mn[0]*mn[1]
         self.emb = nn.Embedding(num_embeddings=num_emb, embedding_dim = hidden_size)
         
-
     '''
         _input: batch size x seq len        
     '''
@@ -51,6 +52,62 @@ class rnn_model(torch.nn.Module):
         _output = torch.matmul(_output, final_mat)  # batch size         
         return _output
     
+    
+# Tensor train decomposition
+class TT: 
+    def __init__(self, input_mat, rank, m_list, n_list, device, dataset):
+        self.k = len(m_list)
+        self.device = torch.device("cuda:" + str(device))
+        data_folder = "TTD/" + dataset + "/"
+        self.cores = []
+        for i in range(self.k):
+            curr_core = np.load(data_folder + str(i+1) + ".npy")
+            curr_core = curr_core.astype(np.double)
+            self.cores.append(torch.tensor(curr_core, device=self.device))    
+        self.input_mat = input_mat
+
+        
+        # Build bases
+        self.row_bases, self.col_bases = [], []
+        _base = 1
+        for i in range(self.k-1, -1, -1):
+            self.row_bases.insert(0, _base)
+            _base *= m_list[i]
+        _base = 1
+        for i in range(self.k-1, -1, -1):
+            self.col_bases.insert(0, _base)
+            _base *= n_list[i]
+            
+        self.m_list = torch.tensor(m_list, dtype=torch.long, device=device).unsqueeze(0)
+        self.n_list = torch.tensor(n_list, dtype=torch.long, device=device).unsqueeze(0)
+        self.row_bases = torch.tensor(self.row_bases, dtype=torch.long, device=self.device)
+        self.col_bases = torch.tensor(self.col_bases, dtype=torch.long, device=self.device)
+        
+    def fitness(self, batch_size):
+        with torch.no_grad():
+            sq_err = 0.
+            for i in tqdm(range(0, self.input_mat.num_entries, batch_size)):
+                with torch.no_grad():
+                    curr_batch_size = min(batch_size, self.input_mat.num_entries - i)
+                    curr_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.device)
+                    row_idx, col_idx = curr_idx // self.input_mat.num_col, curr_idx % self.input_mat.num_col
+                    row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
+                    col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k          
+                    
+                    preds = self.cores[0][row_idx[:,0], col_idx[:,0], :, :]   # batch size x 1 x R                         
+                    #print(preds[1,:,:])
+                    for j in range(1, self.k):
+                        curr_core = self.cores[j][row_idx[:,j], col_idx[:,j], :, :]    # batch size x R x R                                    
+                        preds = torch.matmul(preds, curr_core)  
+                        #print(curr_core[1,:,:])
+                    preds = preds.squeeze()   
+                    vals = torch.tensor(self.input_mat.vals[i:i+curr_batch_size], device=self.device, dtype=torch.double)                    
+                    sq_err += torch.square(preds - vals).sum().item()
+                    #print(preds)
+                    #print(vals)
+                    #break
+                    
+        return 1 - math.sqrt(sq_err)/self.input_mat.norm
     
 class NeuKron_TT:
     '''
