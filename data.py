@@ -17,4 +17,5 @@ class _mat:
         self.src_vals = self.src_matrix.flatten()
         self.real_num_entries = len(self.src_vals)
         self.num_entries = len(self.vals)
-        self.norm = math.sqrt(np.square(self.src_vals).sum())
+        self.norm = math.sqrt(np.square(self.src_vals).sum())        
+        print(f'norm of the tensor: {self.norm}')

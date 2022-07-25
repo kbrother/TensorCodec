@@ -12,12 +12,12 @@ class rnn_model(torch.nn.Module):
     '''
     def __init__(self, rank, m_list, n_list, hidden_size):
         super(rnn_model, self).__init__()
-        self.rank = rankz
+        self.rank = rank
         self.k = len(n_list)
         self.linear_first = nn.Linear(hidden_size, rank)
         self.linear_final = nn.Linear(hidden_size, rank)
         self.linear_middle = nn.Linear(hidden_size, rank*rank)
-        self.rnn = nn.LSTM(hidden_size, hidden_size)
+        self.rnn = nn.LSTM(hidden_size, hidden_size//2, bidirectional=True)
         self.hidden_size = hidden_size
         
         mn_set = set()
@@ -30,8 +30,10 @@ class rnn_model(torch.nn.Module):
         
     '''
         _input: batch size x seq len        
+        first_mat: batch size x 1 x R
+        middle_mat: seq_len -2 x batch size x R x R
+        final_mat: batch size x R x 1
     '''
-    # return value: batch size
     def forward(self, _input):
         _input = _input.transpose(0, 1)
         _, batch_size = _input.size()
@@ -46,12 +48,7 @@ class rnn_model(torch.nn.Module):
         #print(middle_mat.shape)
         middle_mat = middle_mat.view(self.k-2, batch_size, self.rank, self.rank)  # seq len - 2  x batch size x R x R
         
-        _output = torch.matmul(first_mat, middle_mat[0, :, :, :])
-        for i in range(1, self.k-2):
-            _output = torch.matmul(_output, middle_mat[i, :, :, :])
-        _output = torch.matmul(_output, final_mat)  # batch size         
-        return _output
-    
+        return first_mat, middle_mat, final_mat
     
 # Tensor train decomposition
 class TT: 
@@ -61,7 +58,7 @@ class TT:
         data_folder = "TTD/" + dataset + "/"
         self.cores = []
         for i in range(self.k):
-            curr_core = np.load(data_folder + str(i+1) + ".npy")
+            curr_core = np.load(data_folder + str(i+1) + ".npy")  # m x n x R x R
             curr_core = curr_core.astype(np.double)
             self.cores.append(torch.tensor(curr_core, device=self.device))    
         self.input_mat = input_mat
@@ -94,17 +91,14 @@ class TT:
                     row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
                     col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k          
                     
-                    preds = self.cores[0][row_idx[:,0], col_idx[:,0], :, :]   # batch size x 1 x R                         
-                    #print(preds[1,:,:])
+                    preds = self.cores[0][row_idx[:,0], col_idx[:,0], :, :]   # batch size x 1 x R                                             
                     for j in range(1, self.k):
                         curr_core = self.cores[j][row_idx[:,j], col_idx[:,j], :, :]    # batch size x R x R                                    
                         preds = torch.matmul(preds, curr_core)  
-                        #print(curr_core[1,:,:])
+                        
                     preds = preds.squeeze()   
                     vals = torch.tensor(self.input_mat.vals[i:i+curr_batch_size], device=self.device, dtype=torch.double)                    
-                    sq_err += torch.square(preds - vals).sum().item()
-                    #print(preds)
-                    #print(vals)
+                    sq_err += torch.square(preds - vals).sum().item()        
                     #break
                     
         return 1 - math.sqrt(sq_err)/self.input_mat.norm
@@ -171,10 +165,64 @@ class NeuKron_TT:
                 col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
                 _input = row_idx * self.n_list + col_idx + self._add
                 
-            preds = self.model(_input)
-            vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)
+            first_mat, middle_mat, final_mat = self.model(_input)                        
+            preds = torch.matmul(first_mat, middle_mat[0, :, :, :])
+            for i in range(1, self.k-2):
+                preds = torch.matmul(preds, middle_mat[i, :, :, :])
+            preds = torch.matmul(preds, final_mat)  # batch size                                 
+            vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)                       
             curr_loss = torch.square(preds - vals).sum()
             loss += curr_loss.item()
             if is_train:
                 curr_loss.backward()
-        return loss                
+                
+        return loss    
+    
+    
+    # Explicitly guided loss using TTD of which the output has the same size
+    def L2_guide_loss(self, is_train, ttd, batch_size):
+        loss = 0.
+        for i in range(0, self.input_mat.real_num_entries, batch_size):
+            with torch.no_grad():
+                curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
+                curr_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
+                row_idx, col_idx = curr_idx // self.input_mat.src_ncol, curr_idx % self.input_mat.src_ncol
+                row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
+                col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
+                _input = row_idx * self.n_list + col_idx + self._add
+            
+            first_pred, middle_pred, final_pred = self.model(_input)
+            first_vals = ttd.cores[0][row_idx[:, 0], col_idx[:, 0], :, :] # batch size x 1 x R
+            middle_vals = [ttd.cores[j][row_idx[:, j], col_idx[:, j], :, :].unsqueeze(0) for j in range(1, self.k-1)]
+            middle_vals = torch.cat(middle_vals, 0) # seq len-2 x batch size R x R
+            final_vals = ttd.cores[self.k-1][row_idx[:, self.k-1], col_idx[:, self.k-1], :, :] # batch size x R x 1
+            
+            curr_loss = torch.square(first_pred - first_vals).sum()
+            curr_loss += torch.square(middle_pred - middle_vals).sum()
+            curr_loss += torch.square(final_pred - final_vals).sum()
+            if is_train:
+                curr_loss.backward()
+            loss += curr_loss.item()
+        return loss
+    
+    '''
+        Compare the input and output        
+    '''
+    def check_output(self, row_idx, col_idx, ttd):        
+        with torch.no_grad():
+            self.model.eval()
+            row_idx = torch.tensor(row_idx, dtype=torch.long, device=self.i_device)
+            col_idx = torch.tensor(col_idx, dtype=torch.long, device=self.i_device)
+            row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
+            col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
+            _input = row_idx * self.n_list + col_idx + self._add
+            
+            first_pred, middle_pred, final_pred = self.model(_input)
+            first_vals = ttd.cores[0][row_idx[0], col_idx[0], :, :] # batch size x 1 x R
+            print(f'first pred: {first_pred}, first sol: {first_vals}')
+            
+            middle_vals = [ttd.cores[j][row_idx[j], col_idx[j], :, :].unsqueeze(0) for j in range(1, self.k-1)]            
+            for j in range(1, self.k-1):
+                print(f'middel pred:{middle_pred[j-1,:,:,:]}, middle sol: {ttd.cores[j][row_idx[j], col_idx[j], :, :]}')
+            final_vals = ttd.cores[self.k-1][row_idx[self.k-1], col_idx[self.k-1], :, :] # batch size x R x 1
+            print(f'final pred: {final_pred}, final sol:{final_vals}')
