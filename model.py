@@ -20,13 +20,14 @@ class rnn_model(torch.nn.Module):
         self.rnn = nn.LSTM(hidden_size, hidden_size//2, bidirectional=True)
         self.hidden_size = hidden_size
         
+        
         mn_set = set()
         for i in range(self.k):
             mn_set.add((m_list[i], n_list[i]))        
         num_emb = 0
         for mn in mn_set:
             num_emb += mn[0]*mn[1]
-        self.emb = nn.Embedding(num_embeddings=num_emb, embedding_dim = hidden_size)
+        self.emb = nn.Embedding(num_embeddings=num_emb, embedding_dim = hidden_size)        
         
     '''
         _input: batch size x seq len        
@@ -55,7 +56,7 @@ class TT:
     def __init__(self, input_mat, rank, m_list, n_list, device, dataset):
         self.k = len(m_list)
         self.device = torch.device("cuda:" + str(device))
-        data_folder = "TTD/" + dataset + "/"
+        data_folder = "TTD/" + dataset + "/rank" + str(rank) + "/"
         self.cores = []
         for i in range(self.k):
             curr_core = np.load(data_folder + str(i+1) + ".npy")  # m x n x R x R
@@ -117,7 +118,7 @@ class NeuKron_TT:
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
         self.model = rnn_model(rank, m_list, n_list, hidden_size)
-        self.model.float()
+        self.model.float()        
         if len(self.device) > 1:
             self.model = nn.DataParallel(self.model, device_ids = self.device)
         self.model = self.model.to(self.i_device)
@@ -155,7 +156,9 @@ class NeuKron_TT:
         
     # Define L2 loss
     def L2_loss(self, is_train, batch_size):                
-        loss = 0.
+        return_loss = 0.
+        val_sum = 0.
+        pred_sum = 0.
         for i in range(0, self.input_mat.real_num_entries, batch_size):
             with torch.no_grad():
                 curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
@@ -165,18 +168,23 @@ class NeuKron_TT:
                 col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
                 _input = row_idx * self.n_list + col_idx + self._add
                 
-            first_mat, middle_mat, final_mat = self.model(_input)                        
+            #_input = _input.cpu()
+            #self.model.to(torch.device("cpu"))
+            first_mat, middle_mat, final_mat = self.model(_input)                                    
             preds = torch.matmul(first_mat, middle_mat[0, :, :, :])
-            for i in range(1, self.k-2):
-                preds = torch.matmul(preds, middle_mat[i, :, :, :])
-            preds = torch.matmul(preds, final_mat)  # batch size                                 
-            vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)                       
-            curr_loss = torch.square(preds - vals).sum()
-            loss += curr_loss.item()
+            for j in range(1, self.k-2):
+                preds = torch.matmul(preds, middle_mat[j, :, :, :])
+            preds = torch.matmul(preds, final_mat).squeeze()  # batch size                    
+            vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)                                   
+            curr_loss = torch.square(preds - vals).sum()                   
+            return_loss += curr_loss.item()
+            #pred_sum += torch.square(preds).sum().item()
+            #val_sum += torch.square(vals).sum().item()
+                        
             if is_train:
-                curr_loss.backward()
-                
-        return loss    
+                curr_loss.backward()                
+        #print(f'root val sum: {math.sqrt(val_sum)}, loss:{math.sqrt(return_loss)}, pred sum:{pred_sum}')
+        return return_loss    
     
     
     # Explicitly guided loss using TTD of which the output has the same size

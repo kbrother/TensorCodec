@@ -11,7 +11,7 @@ import copy
 def train_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
-    max_fit = sys.float_info.min
+    max_fit = -sys.float_info.max
     n_model.model.train()
     for epoch in range(args.epoch):
         optimizer.zero_grad()
@@ -19,7 +19,7 @@ def train_model(n_model, args):
         opt_state_dict = copy.deepcopy(optimizer.state_dict())
         prev_model = copy.deepcopy(n_model.model.state_dict())
         optimizer.step()        
-        prev_fit = 1 - math.sqrt(prev_loss) / n_model.input_mat.norm   
+        prev_fit = 1 - math.sqrt(prev_loss)/n_model.input_mat.norm   
         
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {prev_fit}\n')    
@@ -33,7 +33,7 @@ def train_model(n_model, args):
                 'optimizer_state_dict': opt_state_dict,
                 'loss': prev_loss
             }, args.save_path + ".pt")
-        print(f'max fit: {max_fit}')
+        
           
 def guide_train(n_model, args, tt_model):
     device = torch.device("cuda:" + str(args.device[0]))
@@ -48,7 +48,7 @@ def guide_train(n_model, args, tt_model):
         n_model.model.eval()
         with torch.no_grad():
             sq_loss = n_model.L2_loss(False, args.batch_size)
-            curr_fit = 1 - math.sqrt(sq_loss) / n_model.input_mat.norm
+            curr_fit = 1 - math.sqrt(sq_loss)/n_model.input_mat.norm
             with open(args.save_path + ".txt", 'a') as lossfile:
                 lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
                 print(f'epoch:{epoch}, train loss: {curr_fit}\n')
@@ -64,9 +64,12 @@ def guide_train(n_model, args, tt_model):
             }, args.save_path + ".pt")
             
             
-# python main.py train -d gms5 -m 2 9 -n 2 9 -de 1 2 3 -rk 20 -hs 20 -sp results/gms5/hs20_r20 -e 200
-# python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 10 -hs 10 -sp results/gms5/guide/10_norm -e 2000 -lr 10
-# python main.py check_output -d gms5 -m 2 9 -n 2 9 -de 0 -rk 10 -hs 10 -sp results/gms5/guide/10_norm.pt 
+# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
+
+# python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/guide/rank2/10_norm -e 2000 -lr 10
+# python main.py guide_train -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 10 -hs 10 -sp results/hsi/guide/10_norm -e 2000 -lr 10
+
+# python main.py check_output -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 
 # python main.py check_tt -d gms5 -m 2 9 -n 2 9 -de 0 
 # python main.py train -d hsi -m 2 10 -n 2 9 3 1 -de 1 2 3 -rk 30 -hs 10 -sp results/hsi/rk40_hs10 -e 200
 if __name__ == '__main__':    
@@ -153,8 +156,8 @@ if __name__ == '__main__':
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)         
         tt_model = TT(input_mat, args.rank, m_list, n_list, args.device[0], args.dataset)
         print(f'fitness: {tt_model.fitness(args.batch_size)}')        
-        checkpoint = torch.load(args.save_path)
-        n_model.model.load_state_dict(checkpoint['model_state_dict'])       
+        #checkpoint = torch.load(args.save_path)
+        #n_model.model.load_state_dict(checkpoint['model_state_dict'])       
         sq_loss = n_model.L2_loss(False, args.batch_size)
         curr_fit = 1 - math.sqrt(sq_loss) / n_model.input_mat.norm
         print(f'fitness: {curr_fit}')
