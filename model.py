@@ -14,12 +14,12 @@ class rnn_model(torch.nn.Module):
         super(rnn_model, self).__init__()
         self.rank = rank
         self.k = len(n_list)
-        self.linear_first = nn.Linear(hidden_size, rank)
-        self.linear_final = nn.Linear(hidden_size, rank)
-        self.linear_middle = nn.Linear(hidden_size, rank*rank)
-        self.rnn = nn.LSTM(hidden_size, hidden_size//2, bidirectional=True)
+        self.flayer = nn.Linear(hidden_size, rank)
+        self.slayer_middle = nn.Linear(rank, rank*rank)
+        self.slayer_boundary = nn.Linear(rank, rank)        
+        self.rnn = nn.LSTM(hidden_size, hidden_size)
         self.hidden_size = hidden_size
-        
+        self._relu = nn.ReLU()        
         
         mn_set = set()
         for i in range(self.k):
@@ -42,10 +42,11 @@ class rnn_model(torch.nn.Module):
         
         self.rnn.flatten_parameters()
         rnn_output, _ = self.rnn(_input)   # seq len x batch size x hidden dim        
-        first_mat = self.linear_first(rnn_output[0,:,:])   
-        final_mat = self.linear_final(rnn_output[-1,:,:])
-        first_mat, final_mat = first_mat.unsqueeze(1), final_mat.unsqueeze(-1)   # batch size x 1 x R
-        middle_mat = self.linear_middle(rnn_output[1:-1,:,:]) 
+        f_output = self._relu(self.flayer(rnn_output))
+        first_mat = self.slayer_boundary(f_output[0,:,:])   
+        final_mat = self.slayer_boundary(f_output[-1,:,:])   # batch size x R
+        first_mat, final_mat = first_mat.unsqueeze(1), final_mat.unsqueeze(-1)   # batch size x 1 x R, batch size x R x 1
+        middle_mat = self.slayer_middle(f_output[1:-1,:,:])  # seq len -2 x batch size x R^2
         #print(middle_mat.shape)
         middle_mat = middle_mat.view(self.k-2, batch_size, self.rank, self.rank)  # seq len - 2  x batch size x R x R
         

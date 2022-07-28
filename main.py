@@ -64,6 +64,7 @@ def guide_train(n_model, args, tt_model):
             }, args.save_path + ".pt")
             
             
+# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 4 -sp results/gms5/test -e 5000 -lr 1e-2
 # python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
 
 # python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/guide/rank2/10_norm -e 2000 -lr 10
@@ -109,7 +110,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-b", "--batch_size",
-        action="store", default=2**14, type=int
+        action="store", default=2**16, type=int
     )
     
     parser.add_argument(
