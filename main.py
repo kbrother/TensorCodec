@@ -33,8 +33,37 @@ def train_model(n_model, args):
                 'optimizer_state_dict': opt_state_dict,
                 'loss': prev_loss
             }, args.save_path + ".pt")
+
+def cont_train(n_model, argss):
+    checkpoint = torch.load(args.load_path)
+    n_model.model.load_state_dict(checkpoint['model_state_dict'])
+    device = torch.device("cuda:" + str(args.device[0]))
+    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    
+    max_fit = -sys.float_info.max
+    n_model.model.train()
+    for epoch in range(checkpoint['epoch']+1, args.epoch):
+        optimizer.zero_grad()
+        prev_loss = n_model.L2_loss(True, args.batch_size)
+        opt_state_dict = copy.deepcopy(optimizer.state_dict())
+        prev_model = copy.deepcopy(n_model.model.state_dict())
+        optimizer.step()        
+        prev_fit = 1 - math.sqrt(prev_loss)/n_model.input_mat.norm   
         
-          
+        with open(args.save_path + ".txt", 'a') as lossfile:
+            lossfile.write(f'epoch:{epoch}, train loss: {prev_fit}\n')    
+            print(f'epoch:{epoch}, train loss: {prev_fit}\n')
+            
+        if max_fit < prev_fit:
+            max_fit = prev_fit
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': prev_model,
+                'optimizer_state_dict': opt_state_dict,
+                'loss': prev_loss
+            }, args.save_path + ".pt")            
+
 def guide_train(n_model, args, tt_model):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
@@ -50,11 +79,10 @@ def guide_train(n_model, args, tt_model):
             sq_loss = n_model.L2_loss(False, args.batch_size)
             curr_fit = 1 - math.sqrt(sq_loss)/n_model.input_mat.norm
             with open(args.save_path + ".txt", 'a') as lossfile:
-                lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
-                print(f'epoch:{epoch}, train loss: {curr_fit}\n')
+                lossfile.write(f'epoch:{epoch}, , guide loss: {prev_loss}, fitness: {curr_fit}\n')    
+                print(f'epoch:{epoch}, guide loss: {prev_loss}, fitness: {curr_fit}\n')
         
-        if max_fit < curr_fit:
-            print("here")
+        if max_fit < curr_fit:            
             max_fit = curr_fit
             torch.save({
                 'epoch': epoch,
@@ -63,12 +91,17 @@ def guide_train(n_model, args, tt_model):
                 'loss': max_fit
             }, args.save_path + ".pt")
             
-            
 # python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 4 -sp results/gms5/test -e 5000 -lr 1e-2
 # python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
+# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
 
-# python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/guide/rank2/10_norm -e 2000 -lr 10
-# python main.py guide_train -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 10 -hs 10 -sp results/hsi/guide/10_norm -e 2000 -lr 10
+# python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 9 -hs 10 -sp results/guide/gms5/test -e 5000 -lr 1e-2
+# python main.py guide_train -d hsi -m 2 10 -n 2 9 3 1 -de 1 -rk 9 -hs 12 -sp results/guide/hsi/test -e 5000 -lr 1e-1
+
+# python main.py retrain -d gms5 -m 2 9 -n 2 9 -de 0 -rk 9 -hs 10 -lp results/guide/gms5/test.pt -sp results/retrain/gms5/test -e 5000 -lr 1e-2
+# python main.py retrain -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 9 -hs 12 -lp results/guide/hsi/test.pt -sp results/retrain/hsi/test -e 5000 -lr 1e-2
+
+# python main.py contrain -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 9 -hs 12 -lp results/retrain/hsi/test.pt -sp results/retrain/hsi/test -e 5000 -lr 1e-2
 
 # python main.py check_output -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 
 # python main.py check_tt -d gms5 -m 2 9 -n 2 9 -de 0 
@@ -119,6 +152,11 @@ if __name__ == '__main__':
     )
     
     parser.add_argument(
+        "-lp", "--load_path",
+        action="store", default="./params/", type=str
+    )
+        
+    parser.add_argument(
         "-hs", "--hidden_size",
         action="store", default=11, type=int
     )
@@ -144,6 +182,14 @@ if __name__ == '__main__':
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
         train_model(n_model, args)
+    elif args.action == "retrain":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
+        checkpoint = torch.load(args.load_path)
+        n_model.model.load_state_dict(checkpoint['model_state_dict'])
+        train_model(n_model, args)
+    elif args.action == "contrain":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)        
+        cont_train(n_model, args)        
     elif args.action == "check_tt":
         tt_model = TT(input_mat, args.rank, m_list, n_list, args.device[0], args.dataset)       
         print(f'fitness: {tt_model.fitness(args.batch_size)}')

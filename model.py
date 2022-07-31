@@ -62,7 +62,7 @@ class TT:
         for i in range(self.k):
             curr_core = np.load(data_folder + str(i+1) + ".npy")  # m x n x R x R
             curr_core = curr_core.astype(np.double)
-            self.cores.append(torch.tensor(curr_core, device=self.device))    
+            self.cores.append(torch.tensor(curr_core, device=self.device))    # 
         self.input_mat = input_mat
 
         
@@ -119,7 +119,7 @@ class NeuKron_TT:
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
         self.model = rnn_model(rank, m_list, n_list, hidden_size)
-        self.model.float()        
+        self.model.double()        
         if len(self.device) > 1:
             self.model = nn.DataParallel(self.model, device_ids = self.device)
         self.model = self.model.to(self.i_device)
@@ -207,8 +207,8 @@ class NeuKron_TT:
             final_vals = ttd.cores[self.k-1][row_idx[:, self.k-1], col_idx[:, self.k-1], :, :] # batch size x R x 1
             
             curr_loss = torch.square(first_pred - first_vals).sum()
-            curr_loss += torch.square(middle_pred - middle_vals).sum()
-            curr_loss += torch.square(final_pred - final_vals).sum()
+            curr_loss = curr_loss + torch.square(middle_pred - middle_vals).sum()
+            curr_loss = curr_loss + torch.square(final_pred - final_vals).sum()
             if is_train:
                 curr_loss.backward()
             loss += curr_loss.item()
