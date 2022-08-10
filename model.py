@@ -49,8 +49,12 @@ class rnn_model(torch.nn.Module):
         middle_mat = self.slayer_middle(f_output[1:-1,:,:])  # seq len -2 x batch size x R^2
         #print(middle_mat.shape)
         middle_mat = middle_mat.view(self.k-2, batch_size, self.rank, self.rank)  # seq len - 2  x batch size x R x R
-        
-        return first_mat, middle_mat, final_mat
+                                                          
+        preds = torch.matmul(first_mat, middle_mat[0, :, :, :])
+        for j in range(1, self.k-2):
+            preds = torch.matmul(preds, middle_mat[j, :, :, :])
+        preds = torch.matmul(preds, final_mat).squeeze()  # batch size 
+        return preds
     
 # Tensor train decomposition
 class TT: 
@@ -170,12 +174,8 @@ class NeuKron_TT:
                 _input = row_idx * self.n_list + col_idx + self._add
                 
             #_input = _input.cpu()
-            #self.model.to(torch.device("cpu"))
-            first_mat, middle_mat, final_mat = self.model(_input)                                    
-            preds = torch.matmul(first_mat, middle_mat[0, :, :, :])
-            for j in range(1, self.k-2):
-                preds = torch.matmul(preds, middle_mat[j, :, :, :])
-            preds = torch.matmul(preds, final_mat).squeeze()  # batch size                    
+            #self.model.to(torch.device("cpu"))            
+            preds = self.model(_input).squeeze()  # batch size                    
             vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)                                   
             curr_loss = torch.square(preds - vals).sum()                   
             return_loss += curr_loss.item()
