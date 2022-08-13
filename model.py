@@ -3,6 +3,7 @@ import torch
 from tqdm import tqdm
 import math
 import numpy as np
+import random
 
 # Model
 class rnn_model(torch.nn.Module):
@@ -157,6 +158,11 @@ class NeuKron_TT:
         
         print(f"The number of params:{ sum(p.numel() for p in self.model.parameters() if p.requires_grad)}")
         
+        self.perm_list = [torch.tensor(list(range(self.input_mat.src_nrow)), dtype=torch.long, device=self.i_device),
+                         torch.tensor(list(range(self.input_mat.src_ncol)), dtype=torch.long, device=self.i_device)]
+        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.src_nrow)), dtype=torch.long, device=self.i_device),
+                         torch.tensor(list(range(self.input_mat.src_ncol)), dtype=torch.long, device=self.i_device)]        
+        
     # Define L2 loss
     def L2_loss(self, is_train, batch_size):                
         return_loss = 0.
@@ -167,6 +173,7 @@ class NeuKron_TT:
                 curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
                 curr_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
                 row_idx, col_idx = curr_idx // self.input_mat.src_ncol, curr_idx % self.input_mat.src_ncol
+                row_idx, col_idx = self.inv_perm_list[0][row_idx], self.inv_perm_list[1][col_idx]
                 row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
                 col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
                 _input = row_idx * self.n_list + col_idx + self._add

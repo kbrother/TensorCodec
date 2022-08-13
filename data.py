@@ -19,3 +19,7 @@ class _mat:
         self.num_entries = len(self.vals)
         self.norm = math.sqrt(np.square(self.src_vals).sum())        
         print(f'norm of the tensor: {self.norm}')
+
+    def extract_slice(self, curr_order, idx):
+        if curr_order == 0: return self.src_matrix[idx, :]
+        else: return self.src_matrix[:, idx]

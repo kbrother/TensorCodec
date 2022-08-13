@@ -8,31 +8,49 @@ from model import NeuKron_TT, TT
 from data import _mat
 import copy
 
+def test_perm(n_model, args):
+    with torch.no_grad():
+        n_model.model.eval()
+        curr_loss = n_model.L2_loss(False, args.batch_size)
+        print(f'initial loss: {curr_loss}')
+        for i in tqdm(range(10)):
+            curr_loss += n_model.change_permutation(args.batch_size, 0)
+            curr_loss += n_model.change_permutation(args.batch_size, 1)
+        
+        print(f'our loss: {curr_loss}, real loss:{n_model.L2_loss(False, args.batch_size)}')
+        
 def train_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
     max_fit = -sys.float_info.max
     n_model.model.train()
     for epoch in range(args.epoch):
-        optimizer.zero_grad()
-        prev_loss = n_model.L2_loss(True, args.batch_size)
-        opt_state_dict = copy.deepcopy(optimizer.state_dict())
-        prev_model = copy.deepcopy(n_model.model.state_dict())
-        optimizer.step()        
-        prev_fit = 1 - math.sqrt(prev_loss)/n_model.input_mat.norm   
+        # change ordering
+        n_model.change_permutation(args.batch_size, 0)
+        n_model.change_permutation(args.batch_size, 1)
         
-        with open(args.save_path + ".txt", 'a') as lossfile:
-            lossfile.write(f'epoch:{epoch}, train loss: {prev_fit}\n')    
-            print(f'epoch:{epoch}, train loss: {prev_fit}\n')
-            
-        if max_fit < prev_fit:
-            max_fit = prev_fit
+        optimizer.zero_grad()
+        n_model.model.train()
+        curr_loss = n_model.L2_loss(True, args.batch_size)
+        curr_fit = 1 - math.sqrt(curr_loss)/n_model.input_mat.norm           
+        if max_fit < curr_fit:
+            max_fit = curr_fit
+            opt_state_dict = copy.deepcopy(optimizer.state_dict())
+            prev_model = copy.deepcopy(n_model.model.state_dict())
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': prev_model,
                 'optimizer_state_dict': opt_state_dict,
-                'loss': prev_loss
+                'loss': curr_fit,
+                'perm': n_model.perm_list
             }, args.save_path + ".pt")
+
+        with open(args.save_path + ".txt", 'a') as lossfile:
+            lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
+            print(f'epoch:{epoch}, train loss: {curr_fit}\n')        
+            
+        optimizer.step() 
+
 
 def cont_train(n_model, argss):
     checkpoint = torch.load(args.load_path)
@@ -91,21 +109,8 @@ def guide_train(n_model, args, tt_model):
                 'loss': max_fit
             }, args.save_path + ".pt")
             
-# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 4 -sp results/gms5/test -e 5000 -lr 1e-2
-# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
-# python main.py train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 -sp results/gms5/noguide/hs10_r2 -e 10000 -lr 1e-2
 
-# python main.py guide_train -d gms5 -m 2 9 -n 2 9 -de 0 -rk 9 -hs 10 -sp results/guide/gms5/test -e 5000 -lr 1e-2
-# python main.py guide_train -d hsi -m 2 10 -n 2 9 3 1 -de 1 -rk 9 -hs 12 -sp results/guide/hsi/test -e 5000 -lr 1e-1
-
-# python main.py retrain -d gms5 -m 2 9 -n 2 9 -de 0 -rk 9 -hs 10 -lp results/guide/gms5/test.pt -sp results/retrain/gms5/test -e 5000 -lr 1e-2
-# python main.py retrain -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 9 -hs 12 -lp results/guide/hsi/test.pt -sp results/retrain/hsi/test -e 5000 -lr 1e-2
-
-# python main.py contrain -d hsi -m 2 10 -n 2 9 3 1 -de 0 -rk 9 -hs 12 -lp results/retrain/hsi/test.pt -sp results/retrain/hsi/test -e 5000 -lr 1e-2
-
-# python main.py check_output -d gms5 -m 2 9 -n 2 9 -de 0 -rk 2 -hs 10 
-# python main.py check_tt -d gms5 -m 2 9 -n 2 9 -de 0 
-# python main.py train -d hsi -m 2 10 -n 2 9 3 1 -de 1 2 3 -rk 30 -hs 10 -sp results/hsi/rk40_hs10 -e 200
+# python main.py test_perm -d action_reorder -m 2 6 3 2 -n 2 6 3 2 -de 0 1 2 3 -rk 5 -hs 2
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')
@@ -209,5 +214,8 @@ if __name__ == '__main__':
         curr_fit = 1 - math.sqrt(sq_loss) / n_model.input_mat.norm
         print(f'fitness: {curr_fit}')
         n_model.check_output(256, 256, tt_model)        
+    elif args.action == "test_perm":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)      
+        test_perm(n_model, args)        
     else:
         assert(False)
