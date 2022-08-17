@@ -26,7 +26,7 @@ def train_model(n_model, args):
     n_model.model.train()
     for epoch in range(args.epoch):
         # change ordering
-        n_model.change_permutation(args.batch_size, 0)
+        #n_model.change_permutation(args.batch_size, 0)
         n_model.change_permutation(args.batch_size, 1)
         
         optimizer.zero_grad()
@@ -52,6 +52,22 @@ def train_model(n_model, args):
         optimizer.step() 
 
 
+def tune_model(n_model, args):
+    device = torch.device("cuda:" + str(args.device[0]))
+    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
+    max_fit = -sys.float_info.max
+    n_model.load_samples(args.dataset, args.batch_size)
+    for epoch in range(args.epoch):        
+        optimizer.zero_grad()
+        n_model.model.train()
+        curr_loss = math.sqrt(n_model.L2_tuning_loss(True, args.batch_size))
+        curr_fit = 1 - curr_loss / n_model.sample_norm
+        with open(args.save_path + ".txt", 'a') as lossfile:
+            lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
+            print(f'epoch:{epoch}, train loss: {curr_fit}\n')                    
+        optimizer.step() 
+
+    
 def cont_train(n_model, argss):
     checkpoint = torch.load(args.load_path)
     n_model.model.load_state_dict(checkpoint['model_state_dict'])
@@ -148,7 +164,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-b", "--batch_size",
-        action="store", default=2**16, type=int
+        action="store", default=2**17, type=int
     )
     
     parser.add_argument(
@@ -202,8 +218,7 @@ if __name__ == '__main__':
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)         
         tt_model = TT(input_mat, args.rank, m_list, n_list, args.device[0], args.dataset)
         print(f'fitness: {tt_model.fitness(args.batch_size)}')
-        guide_train(n_model, args, tt_model)
-    
+        guide_train(n_model, args, tt_model)    
     elif args.action == "check_output":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)         
         tt_model = TT(input_mat, args.rank, m_list, n_list, args.device[0], args.dataset)
@@ -216,6 +231,9 @@ if __name__ == '__main__':
         n_model.check_output(256, 256, tt_model)        
     elif args.action == "test_perm":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)      
-        test_perm(n_model, args)        
+        test_perm(n_model, args)      
+    elif args.action == "tune":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
+        tune_model(n_model, args)
     else:
         assert(False)

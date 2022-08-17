@@ -192,6 +192,40 @@ class NeuKron_TT:
         #print(f'root val sum: {math.sqrt(val_sum)}, loss:{math.sqrt(return_loss)}, pred sum:{pred_sum}')
         return return_loss    
     
+    def load_samples(self, data_name, batch_size):
+        data_file = "samples/" + data_name + "_samples.npy"
+        self.sampled_entry = np.load(data_file)
+        num_entry = self.sampled_entry.shape[0]
+        self.sample_norm = 0.
+        for i in range(0, num_entry, batch_size):
+            with torch.no_grad():
+                curr_batch_size = min(batch_size, num_entry - i)
+                curr_idx = torch.tensor(self.sampled_entry[i:i+curr_batch_size], dtype=torch.long, device=self.i_device)                                
+                vals = torch.tensor(self.input_mat.src_vals[curr_idx.cpu().numpy()], device=self.i_device)
+                self.sample_norm += torch.square(vals).sum().item()
+        
+        self.sample_norm = math.sqrt(self.sample_norm)
+        
+    def L2_tuning_loss(self, is_train, batch_size):       
+        num_entry = self.sampled_entry.shape[0]
+        return_loss = 0.
+        for i in range(0, num_entry, batch_size):
+            with torch.no_grad():
+                curr_batch_size = min(batch_size, num_entry - i)
+                curr_idx = torch.tensor(self.sampled_entry[i:i+curr_batch_size], dtype=torch.long, device=self.i_device)
+                row_idx, col_idx = curr_idx // self.input_mat.src_ncol, curr_idx % self.input_mat.src_ncol                                
+                vals = torch.tensor(self.input_mat.src_vals[curr_idx.cpu().numpy()], device=self.i_device)
+                
+                row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
+                col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
+                _input = row_idx * self.n_list + col_idx + self._add
+            
+            preds = self.model(_input).squeeze()            
+            curr_loss = torch.square(preds - vals).sum()
+            return_loss += curr_loss.item()
+            
+            if is_train: curr_loss.backward()        
+        return return_loss
     
     # Explicitly guided loss using TTD of which the output has the same size
     def L2_guide_loss(self, is_train, ttd, batch_size):
