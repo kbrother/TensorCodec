@@ -192,6 +192,35 @@ class NeuKron_TT:
         #print(f'root val sum: {math.sqrt(val_sum)}, loss:{math.sqrt(return_loss)}, pred sum:{pred_sum}')
         return return_loss    
     
+    # minibatch L2 loss
+    def L2_minibatch_loss(self, is_train, batch_size, num_batch):
+        return_loss, minibatch_norm = 0., 0.
+        num_sample = math.ceil(self.input_mat.real_num_entries / num_batch)
+        # Indices of sampled matrix entries
+        samples = np.random.permutation(self.input_mat.real_num_entries)
+        samples = samples[:num_sample]
+        for i in range(0, num_sample, batch_size):
+            with torch.no_grad():
+                curr_batch_size = min(batch_size, num_sample - i)
+                curr_ten_idx = samples[i:i+curr_batch_size]
+                vals = torch.tensor(self.input_mat.src_vals[curr_ten_idx], device=self.i_device)
+                
+                curr_ten_idx = torch.tensor(samples[i:i+curr_batch_size], device=self.i_device)
+                ten_row_idx, ten_col_idx = curr_ten_idx // self.input_mat.src_ncol, curr_ten_idx % self.input_mat.src_ncol
+                model_row_idx, model_col_idx = self.inv_perm_list[0][ten_row_idx], self.inv_perm_list[1][ten_col_idx] 
+                model_row_idx = model_row_idx.unsqueeze(-1) // self.row_bases % self.m_list
+                model_col_idx = model_col_idx.unsqueeze(-1) // self.col_bases % self.n_list
+                model_input = model_row_idx * self.n_list + model_col_idx + self._add
+            
+            preds = self.model(model_input).squeeze()
+            curr_loss = torch.square(preds - vals).sum()
+            return_loss += curr_loss.item()
+            minibatch_norm += torch.square(vals).sum().item()
+            
+            if is_train: curr_loss.backward()
+        return math.sqrt(return_loss), math.sqrt(minibatch_norm)
+                
+        
     def load_samples(self, data_name, batch_size):
         data_file = "samples/" + data_name + "_samples.npy"
         self.sampled_entry = np.load(data_file)

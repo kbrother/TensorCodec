@@ -51,7 +51,43 @@ def train_model(n_model, args):
             
         optimizer.step() 
 
+def minibatch_train(n_model, args):
+    device = torch.device("cuda:" + str(args.device[0]))
+    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch)    
+    max_fit = -sys.float_info.max
+    n_model.model.train()
+    for epoch in range(args.epoch):
+        # change ordering
+        #n_model.change_permutation(args.batch_size, 0)
+        n_model.change_permutation(args.batch_size, 1)
+                
+        n_model.model.train()       
+        for i in tqdm(range(args.num_batch)):
+            optimizer.zero_grad()
+            mini_loss, mini_norm = n_model.L2_minibatch_loss(True, args.batch_size, args.num_batch)
+            optimizer.step() 
+        
+        with torch.no_grad():
+            n_model.model.eval()
+            curr_loss = n_model.L2_loss(False, args.batch_size)
+            curr_fit = 1 - math.sqrt(curr_loss)/n_model.input_mat.norm
+            if max_fit < curr_fit:
+                max_fit = curr_fit
+                opt_state_dict = copy.deepcopy(optimizer.state_dict())
+                prev_model = copy.deepcopy(n_model.model.state_dict())
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': prev_model,
+                    'optimizer_state_dict': opt_state_dict,
+                    'loss': curr_fit,
+                    'perm': n_model.perm_list
+                }, args.save_path + ".pt")
 
+        with open(args.save_path + ".txt", 'a') as lossfile:
+            lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
+            print(f'epoch:{epoch}, train loss: {curr_fit}\n')        
+                    
+        
 def tune_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
@@ -168,6 +204,11 @@ if __name__ == '__main__':
     )
     
     parser.add_argument(
+        "-nb", "--num_batch",
+        action="store", default=20, type=int
+    )
+    
+    parser.add_argument(
         "-sp", "--save_path",
         action="store", default="./params/", type=str
     )
@@ -235,5 +276,8 @@ if __name__ == '__main__':
     elif args.action == "tune":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
         tune_model(n_model, args)
+    elif args.action == "train_mini":
+        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
+        minibatch_train(n_model, args)
     else:
         assert(False)
