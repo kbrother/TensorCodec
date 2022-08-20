@@ -19,7 +19,7 @@ def test_perm(n_model, args):
         
         print(f'our loss: {curr_loss}, real loss:{n_model.L2_loss(False, args.batch_size)}')
         
-def train_model(n_model, args):
+def train_full_batch(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
     max_fit = -sys.float_info.max
@@ -51,7 +51,7 @@ def train_model(n_model, args):
             
         optimizer.step() 
 
-def minibatch_train(n_model, args):
+def train_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch)    
     max_fit = -sys.float_info.max
@@ -276,8 +276,8 @@ if __name__ == '__main__':
     elif args.action == "tune":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
         tune_model(n_model, args)
-    elif args.action == "train_mini":
+    elif args.action == "train_full":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)
-        minibatch_train(n_model, args)
+        train_full_batch(n_model, args)
     else:
         assert(False)
