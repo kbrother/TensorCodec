@@ -8,6 +8,7 @@ class _mat:
         self.src_matrix = np.load(data_name)
         self.src_matrix = self.src_matrix.astype(np.double)
         
+        self.src_dims = list(np.shape(self.src_matrix))
         self.src_nrow, self.src_ncol = np.shape(self.src_matrix)[0], np.shape(self.src_matrix)[1]
         self._matrix = self.src_matrix.copy()
         if (num_row > self.src_nrow) or (num_col > self.src_ncol):
