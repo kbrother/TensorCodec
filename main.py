@@ -58,7 +58,7 @@ def train_model(n_model, args):
     n_model.model.train()
     for epoch in range(args.epoch):
         # change ordering
-        #n_model.change_permutation(args.batch_size, 0)
+        n_model.change_permutation(args.batch_size, 0)
         n_model.change_permutation(args.batch_size, 1)
                 
         n_model.model.train()       

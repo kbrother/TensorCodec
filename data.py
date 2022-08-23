@@ -3,7 +3,10 @@ import numpy as np
 
 # Matrix
 class _mat:
-    def __init__(self, data_name, num_row, num_col):
+    '''
+        dims: dimensions with padded size
+    '''
+    def __init__(self, data_name, dims):
         self.num_row, self.num_col = num_row, num_col
         self.src_matrix = np.load(data_name)
         self.src_matrix = self.src_matrix.astype(np.double)
