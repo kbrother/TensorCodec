@@ -105,38 +105,44 @@ class NeuKron_TT:
                                     
         # move to gpu
         for i in range(self.order):
-            self.input_size[i] = torch.tensor(self.input_size[i], dtype=torch.long, device=self.i_device)
-            self.bases_list[i] = torch.tensor(self.bases_list[i], dtype=torch.long, device=self.i_device) 
+            self.input_size[i] = torch.tensor(self.input_size[i], dtype=torch.long, device=self.i_device)  # order x k    
+            self.bases_list[i] = torch.tensor(self.bases_list[i], dtype=torch.long, device=self.i_device)  # order x k
         self._add = torch.tensor(self._add, dtype=torch.long, device=self.i_device).unsqueeze(0)                
         
         print(f"The number of params:{ sum(p.numel() for p in self.model.parameters() if p.requires_grad)}")
+        self.perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+    
+    
+    # Given a model indices output predictions
+    # model_idx: batch size x order
+    # output: batch size
+    def predict(self, model_idx):
+        batch_size = model_idx.shape[0]
+        model_input = torch.zeros((batch_size, k), device=self.i_device)  # batch size x k
+        for i in range(self.order):
+            curr_idx = model_idx[:, i].unsqueeze(-1) # batch_size
+            curr_idx = curr_idx // self.bases_list[i] % self.input_size[i]  # batch size x k
+            model_input = model_input * self.input_size[i].unsqueeze(0) + curr_idx
         
-        self.perm_list = [torch.tensor(list(range(self.input_mat.src_nrow)), dtype=torch.long, device=self.i_device),
-                         torch.tensor(list(range(self.input_mat.src_ncol)), dtype=torch.long, device=self.i_device)]
-        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.src_nrow)), dtype=torch.long, device=self.i_device),
-                         torch.tensor(list(range(self.input_mat.src_ncol)), dtype=torch.long, device=self.i_device)]        
-        
+        return self.model(model_input)
+
     # Define L2 loss
     def L2_loss(self, is_train, batch_size):                
-        return_loss = 0.
+        return_loss = 0.        
         for i in range(0, self.input_mat.real_num_entries, batch_size):
             with torch.no_grad():
                 curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
-                curr_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
-                row_idx, col_idx = curr_idx // self.input_mat.src_ncol, curr_idx % self.input_mat.src_ncol
-                row_idx, col_idx = self.inv_perm_list[0][row_idx], self.inv_perm_list[1][col_idx]
-                row_idx = row_idx.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
-                col_idx = col_idx.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
-                _input = row_idx * self.n_list + col_idx + self._add
-                
-            #_input = _input.cpu()
-            #self.model.to(torch.device("cpu"))            
-            preds = self.model(_input).squeeze()  # batch size                    
+                curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
+                curr_ten_idx = curr_ten_idx // self.input_mat.base % self.input_mat.src_dims_gpu                
+                curr_model_idx = curr_ten_idx.clon()
+                for j in range(self.order):
+                    curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
+                            
+            preds = self.predict(curr_model_idx)               
             vals = torch.tensor(self.input_mat.src_vals[i:i+curr_batch_size], device=self.i_device)                                   
             curr_loss = torch.square(preds - vals).sum()                   
             return_loss += curr_loss.item()
-            #pred_sum += torch.square(preds).sum().item()
-            #val_sum += torch.square(vals).sum().item()
                         
             if is_train:
                 curr_loss.backward()                
@@ -144,34 +150,31 @@ class NeuKron_TT:
         return return_loss    
     
     # minibatch L2 loss
-    def L2_minibatch_loss(self, is_train, batch_size, num_batch):
+    # samples: indices of sampled matrix entries
+    def L2_minibatch_loss(self, is_train, batch_size, samples):
         return_loss, minibatch_norm = 0., 0.
-        num_sample = math.ceil(self.input_mat.real_num_entries / num_batch)
-        # Indices of sampled matrix entries
-        samples = np.random.permutation(self.input_mat.real_num_entries)
-        samples = samples[:num_sample]
+        num_sample = samples.shape[0]
+        # Indices of sampled matrix entries        
         for i in range(0, num_sample, batch_size):
             with torch.no_grad():
                 curr_batch_size = min(batch_size, num_sample - i)
                 curr_ten_idx = samples[i:i+curr_batch_size]
                 vals = torch.tensor(self.input_mat.src_vals[curr_ten_idx], device=self.i_device)
                 
-                curr_ten_idx = torch.tensor(samples[i:i+curr_batch_size], device=self.i_device)
-                ten_row_idx, ten_col_idx = curr_ten_idx // self.input_mat.src_ncol, curr_ten_idx % self.input_mat.src_ncol
-                model_row_idx, model_col_idx = self.inv_perm_list[0][ten_row_idx], self.inv_perm_list[1][ten_col_idx] 
-                model_row_idx = model_row_idx.unsqueeze(-1) // self.row_bases % self.m_list
-                model_col_idx = model_col_idx.unsqueeze(-1) // self.col_bases % self.n_list
-                model_input = model_row_idx * self.n_list + model_col_idx + self._add
-            
-            preds = self.model(model_input).squeeze()
+                curr_ten_idx = torch.tensor(curr_ten_idx, device=self.i_device).unsqueeze(-1)
+                curr_ten_idx = curr_ten_idx // self.input_mat.base % self.input_mat.src_dims_gpu # batch size x self.order
+                curr_model_idx = curr_ten_idx.clone()                
+                for j in range(self.order):
+                    curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
+                                                
+            preds = self.predict(curr_model_idx)
             curr_loss = torch.square(preds - vals).sum()
             return_loss += curr_loss.item()
             minibatch_norm += torch.square(vals).sum().item()
             
             if is_train: curr_loss.backward()
         return math.sqrt(return_loss), math.sqrt(minibatch_norm)
-                
-    
+                    
     '''
         Input
             curr_order: 0 for row and 1 for col
