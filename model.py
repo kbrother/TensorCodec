@@ -180,7 +180,7 @@ class NeuKron_TT:
         self.hidden_size = hidden_size
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
-        self.model = sum_model(rank, input_size, hidden_size)
+        self.model = rnn_model(rank, input_size, hidden_size)
         self.model.double()     
         if len(self.device) > 1:
             self.model = nn.DataParallel(self.model, device_ids = self.device)                        
