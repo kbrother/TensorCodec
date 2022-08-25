@@ -180,12 +180,11 @@ class NeuKron_TT:
         self.hidden_size = hidden_size
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
-        self.model = rnn_model(rank, input_size, hidden_size)
-        self.model.double()            
+        self.model = sum_model(rank, input_size, hidden_size)
+        self.model.double()     
         if len(self.device) > 1:
-            self.model = nn.DataParallel(self.model, device_ids = self.device)                
-        self.model = self.model.to(self.i_device)
-        
+            self.model = nn.DataParallel(self.model, device_ids = self.device)                        
+        self.model = self.model.to(self.i_device)        
         # Build bases, order x k
         self.bases_list = [[] for _ in range(self.order)]        
         for i in range(self.order):
@@ -219,9 +218,9 @@ class NeuKron_TT:
         
         print(f"The number of params:{ sum(p.numel() for p in self.model.parameters() if p.requires_grad)}")
         # model -> matrix
-        self.perm_list = [torch.tensor(list(range(self.input_mat.src_dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+        self.perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
         # matrix -> model
-        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.src_dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
     
     
     # Given a model indices output predictions
@@ -237,7 +236,7 @@ class NeuKron_TT:
         
         model_input = model_input + self._add
         #self.model = self.model.to(torch.device("cpu"))
-        #model_input = model_input.cpu()       
+        #model_input = model_input.cpu()               
         return self.model(model_input)
 
     # Define L2 loss
@@ -247,7 +246,7 @@ class NeuKron_TT:
             with torch.no_grad():
                 curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
                 curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
-                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.base % self.input_mat.src_dims_gpu # batch size x order      
+                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.src_base % self.input_mat.src_dims_gpu # batch size x order      
                 curr_model_idx = curr_ten_idx.clone()
                 for j in range(self.order):
                     curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
@@ -266,18 +265,18 @@ class NeuKron_TT:
         return_val = 0.        
         self.model_dims = []
         num_entry = 1
-        for i in range(self.order): num_entry *= torch.prod(self.input_size[i]).item()
+        for i in range(self.order): num_entry *= self.input_mat.dims[i].item()
             
         with torch.no_grad():
             for i in tqdm(range(0, num_entry, batch_size)):
                 curr_batch_size = min(batch_size, num_entry - i)
                 curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)           
-                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.base % self.input_mat.src_dims_gpu                                
+                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat._base % self.input_mat.dims                              
                 curr_model_idx = curr_ten_idx.clone()                
                 for j in range(self.order):
                     curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
 
-                preds = self.predict(curr_model_idx)               
+                preds = self.predict(curr_model_idx.clone())               
                 return_val += preds.sum().item()
 
         return return_val
@@ -295,7 +294,7 @@ class NeuKron_TT:
                 vals = torch.tensor(self.input_mat.src_vals[curr_ten_idx], device=self.i_device)
                 
                 curr_ten_idx = torch.tensor(curr_ten_idx, device=self.i_device).unsqueeze(-1)
-                curr_ten_idx = curr_ten_idx // self.input_mat.base % self.input_mat.src_dims_gpu # batch size x self.order
+                curr_ten_idx = curr_ten_idx // self.input_mat.src_base % self.input_mat.src_dims_gpu # batch size x self.order
                 curr_model_idx = curr_ten_idx.clone()                
                 for j in range(self.order):
                     curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]

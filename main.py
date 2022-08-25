@@ -153,7 +153,7 @@ if __name__ == '__main__':
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat("../data/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "../data/" + args.dataset + ".npy", args.device[0])        
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
         train_model(n_model, args)
@@ -170,10 +170,10 @@ if __name__ == '__main__':
         middle_mat = np.ones((args.rank, args.rank))
         final_mat = np.ones((args.rank, 1))
         
-        gt_result = np.dot(first_mat, middle_mat)
+        gt_result = first_mat
         for i in range(k-2):
-            gt_result = np.dot(gt_result, middle_mat)
-        gt_result = np.dot(gt_result, final_mat)
+            gt_result = np.matmul(gt_result, middle_mat)
+        gt_result = np.matmul(gt_result, final_mat)
         print(f'model sum: {n_model.entry_sum(args.batch_size)}, gt result: {gt_result.item()}')
     else:
         assert(False)
