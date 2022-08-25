@@ -31,7 +31,7 @@ class rnn_model(torch.nn.Module):
             curr_num_emb = 1
             for i in range(self.order): curr_num_emb *= _input[i]
             num_emb += curr_num_emb
-        self.emb = nn.Embedding(num_embeddings=curr_num_emb, embedding_dim = hidden_size)        
+        self.emb = nn.Embedding(num_embeddings=num_emb, embedding_dim = hidden_size)        
         
     '''
         _input: batch size x seq len        
@@ -49,14 +49,122 @@ class rnn_model(torch.nn.Module):
         final_mat = self.layer_final(rnn_output[-1,:,:])   # batch size x R
         first_mat, final_mat = first_mat.unsqueeze(1), final_mat.unsqueeze(-1)   # batch size x 1 x R, batch size x R x 1
         middle_mat = self.layer_middle(rnn_output[1:-1,:,:])  # seq len -2 x batch size x R^2
-        #print(middle_mat.shape)
+        
         middle_mat = middle_mat.view(self.k-2, batch_size, self.rank, self.rank)  # seq len - 2  x batch size x R x R
-                                                          
         preds = torch.matmul(first_mat, middle_mat[0, :, :, :])
         for j in range(1, self.k-2):
             preds = torch.matmul(preds, middle_mat[j, :, :, :])
         preds = torch.matmul(preds, final_mat).squeeze()  # batch size 
         return preds
+        
+        
+# Model
+class sum_model(torch.nn.Module):
+    '''
+        input_size: list of list that saves the size of inputs of all levels for each mode
+        order x k
+    '''
+    def __init__(self, rank, input_size, hidden_size):
+        super(sum_model, self).__init__()
+        self.rank = rank
+        self.k = len(input_size[0])
+        self.layer_first = nn.Linear(hidden_size, rank)
+        self.layer_middle = nn.Linear(hidden_size, rank*rank)
+        self.layer_final = nn.Linear(hidden_size, rank)        
+        self.rnn = nn.LSTM(hidden_size, hidden_size)
+        self.hidden_size = hidden_size        
+        self.order = len(input_size)
+        self.input_size_1d = []
+        self._add = []
+        
+        input_set = set()
+        num_emb, prev_num_emb = 0, 0
+        for i in range(self.k):
+            curr_input = [input_size[j][i] for j in range(self.order)]            
+            curr_input_size = np.prod(np.array(curr_input))
+            self.input_size_1d.append(curr_input_size)            
+            
+            if tuple(curr_input) not in input_set:
+                input_set.add(tuple(curr_input))                            
+                prev_num_emb = num_emb
+                num_emb += curr_input_size
+            self._add.append(prev_num_emb)
+        self.emb = nn.Embedding(num_embeddings=num_emb, embedding_dim = hidden_size)        
+        
+    '''
+        _input: batch size x seq len        
+       -----------------------------------
+       preds: batch size 
+    '''
+    def forward(self, _input):
+        _input = _input.transpose(0, 1)
+        _, batch_size = _input.size()
+        curr_device = torch.device('cuda:' + str(_input.get_device()))        
+        #curr_device = torch.device("cpu")
+        self.rnn.flatten_parameters()
+                
+        # Handle the first layer
+        curr_input = torch.arange(0, self.input_size_1d[0], device=curr_device)
+        curr_input = self.emb(curr_input)     # num_input_0 x hidden size
+        '''
+                curr_output: 1 x num_input0 x hidden_size
+                h_output, c_output: 1 x num_input0 x hidden_size
+        '''
+        curr_output, (h_output, c_output) = self.rnn(curr_input.unsqueeze(0))
+        curr_output = self.layer_first(curr_output.squeeze(0))   # num_input0 x rank
+        curr_sum = torch.sum(curr_output, dim=0, keepdim=True)    # 1 x rank
+        curr_output = curr_output / curr_sum
+        
+        total_output = curr_output[_input[0,:], :].unsqueeze(1)      # batch size x 1 x rank
+        h_output, c_output = h_output[:, _input[0,:], :], c_output[:, _input[0,:], :] 
+                
+        # Handle the middle layer
+        temp_idx = torch.arange(batch_size).to(curr_device)
+        for i in range(1, self.k-1):
+            curr_input = torch.arange(self._add[i], self._add[i] + self.input_size_1d[i], device=curr_device)
+            curr_input = self.emb(curr_input)    # num_input x hidden_size
+            curr_input = curr_input.repeat(batch_size, 1)    # batch_size*num_input x hidden_size
+            h_input = torch.repeat_interleave(h_output, self.input_size_1d[i], dim=1)   # 1 x batchsize*num_input x hidden size
+            c_input = torch.repeat_interleave(c_output, self.input_size_1d[i], dim=1)   # 1 x batchsize*num_input x hidden size
+            '''
+                curr_output, h_output, c_output: 1 x batch_size*num_input x hidden_size                 
+            '''   
+            curr_output, (h_output, c_output) = self.rnn(curr_input.unsqueeze(0), (h_input, c_input))
+            curr_output = curr_output.squeeze().view(batch_size, self.input_size_1d[i], -1)   # batch size x num_input x hidden size
+            curr_output = self.layer_middle(curr_output)     # batch size x num_input x rank^2
+            curr_sum = torch.sum(curr_output, dim=1, keepdim=True)    # batch size x 1 x rank^2
+            curr_output = curr_output / curr_sum
+                        
+            #print(f'i:{i}, input:{_input[i, :]}, add:{self._add[i]}')
+            curr_output = curr_output[temp_idx, _input[i, :] - self._add[i], :]   # batch size x rank^2
+            curr_output = curr_output.view(batch_size, self.rank, -1)  # batch size x rank x rank
+            total_output = torch.matmul(total_output, curr_output) 
+            h_output = h_output.squeeze().view(batch_size, self.input_size_1d[i],  -1)  # batch size x num_input x hidden size
+            c_output = c_output.squeeze().view(batch_size, self.input_size_1d[i], -1)  # batch size x num input x hidden size
+            h_output = h_output[temp_idx, _input[i,:] - self._add[i], :].unsqueeze(0)   # 1 x batch size x hidden size
+            c_output = c_output[temp_idx, _input[i,:] - self._add[i], :].unsqueeze(0)   # 1 x batch size x hidden size
+            
+        # Handle the final layer
+        curr_input = torch.arange(self._add[-1], self._add[-1] + self.input_size_1d[-1], device=curr_device)
+        curr_input = self.emb(curr_input)  # num_input x hidden_size
+        curr_input = curr_input.repeat(batch_size, 1)   # batch_size*num_input x hidden_size 
+        h_input = torch.repeat_interleave(h_output, self.input_size_1d[-1], dim=1) # 1 x batch size*num_input x hidden size   
+        c_input = torch.repeat_interleave(c_output, self.input_size_1d[-1], dim=1)   # 1 x batch size*num_input x hidden size  
+        
+        '''
+            curr_output, h_output, c_output: 1 x batch_size*num_input x hidden_size                 
+        '''        
+        curr_output, (h_output, c_output) = self.rnn(curr_input.unsqueeze(0), (h_input, c_input))
+        curr_output = curr_output.squeeze().view(batch_size, self.input_size_1d[-1], -1)   # batch size x num_input x hidden size
+        curr_output = self.layer_final(curr_output)
+        curr_sum = torch.sum(curr_output, dim=1, keepdim=True)    # batch size x 1 x rank        
+        curr_output = curr_output / curr_sum 
+        
+        curr_output = curr_output[temp_idx, _input[-1,:] - self._add[-1], :]  # batch size x rank
+        curr_output = curr_output.unsqueeze(-1)   # batch size x rank x 1
+        total_output = torch.matmul(total_output, curr_output)
+        return total_output.squeeze()
+    
     
 class NeuKron_TT:
     '''
@@ -73,9 +181,9 @@ class NeuKron_TT:
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
         self.model = rnn_model(rank, input_size, hidden_size)
-        self.model.double()        
+        self.model.double()            
         if len(self.device) > 1:
-            self.model = nn.DataParallel(self.model, device_ids = self.device)
+            self.model = nn.DataParallel(self.model, device_ids = self.device)                
         self.model = self.model.to(self.i_device)
         
         # Build bases, order x k
@@ -91,7 +199,7 @@ class NeuKron_TT:
         _temp = 0
         for i in range(self.k):
             curr_input = [input_size[j][i] for j in range(self.order)]
-            curr_input_size = math.prod(curr_input)
+            curr_input_size = np.prod(np.array(curr_input))
             curr_input = tuple(curr_input)            
             
             if curr_input not in input_size_dict:
@@ -102,7 +210,7 @@ class NeuKron_TT:
         for i in range(self.k):
             curr_input = tuple([input_size[j][i] for j in range(self.order)])
             self._add.append(input_size_dict[curr_input])
-                                    
+        print(self._add)    
         # move to gpu
         for i in range(self.order):
             self.input_size[i] = torch.tensor(self.input_size[i], dtype=torch.long, device=self.i_device)  # order x k    
@@ -110,8 +218,10 @@ class NeuKron_TT:
         self._add = torch.tensor(self._add, dtype=torch.long, device=self.i_device).unsqueeze(0)                
         
         print(f"The number of params:{ sum(p.numel() for p in self.model.parameters() if p.requires_grad)}")
-        self.perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
-        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+        # model -> matrix
+        self.perm_list = [torch.tensor(list(range(self.input_mat.src_dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
+        # matrix -> model
+        self.inv_perm_list = [torch.tensor(list(range(self.input_mat.src_dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
     
     
     # Given a model indices output predictions
@@ -119,23 +229,26 @@ class NeuKron_TT:
     # output: batch size
     def predict(self, model_idx):
         batch_size = model_idx.shape[0]
-        model_input = torch.zeros((batch_size, k), device=self.i_device)  # batch size x k
+        model_input = torch.zeros((batch_size, self.k), dtype=torch.long, device=self.i_device)  # batch size x k   
         for i in range(self.order):
             curr_idx = model_idx[:, i].unsqueeze(-1) # batch_size
             curr_idx = curr_idx // self.bases_list[i] % self.input_size[i]  # batch size x k
             model_input = model_input * self.input_size[i].unsqueeze(0) + curr_idx
         
+        model_input = model_input + self._add
+        #self.model = self.model.to(torch.device("cpu"))
+        #model_input = model_input.cpu()       
         return self.model(model_input)
 
     # Define L2 loss
     def L2_loss(self, is_train, batch_size):                
-        return_loss = 0.        
+        return_loss = 0.
         for i in range(0, self.input_mat.real_num_entries, batch_size):
             with torch.no_grad():
                 curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
                 curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
-                curr_ten_idx = curr_ten_idx // self.input_mat.base % self.input_mat.src_dims_gpu                
-                curr_model_idx = curr_ten_idx.clon()
+                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.base % self.input_mat.src_dims_gpu # batch size x order      
+                curr_model_idx = curr_ten_idx.clone()
                 for j in range(self.order):
                     curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
                             
@@ -149,6 +262,26 @@ class NeuKron_TT:
         #print(f'root val sum: {math.sqrt(val_sum)}, loss:{math.sqrt(return_loss)}, pred sum:{pred_sum}')
         return return_loss    
     
+    def entry_sum(self, batch_size):
+        return_val = 0.        
+        self.model_dims = []
+        num_entry = 1
+        for i in range(self.order): num_entry *= torch.prod(self.input_size[i]).item()
+            
+        with torch.no_grad():
+            for i in tqdm(range(0, num_entry, batch_size)):
+                curr_batch_size = min(batch_size, num_entry - i)
+                curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)           
+                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.base % self.input_mat.src_dims_gpu                                
+                curr_model_idx = curr_ten_idx.clone()                
+                for j in range(self.order):
+                    curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
+
+                preds = self.predict(curr_model_idx)               
+                return_val += preds.sum().item()
+
+        return return_val
+        
     # minibatch L2 loss
     # samples: indices of sampled matrix entries
     def L2_minibatch_loss(self, is_train, batch_size, samples):
@@ -208,9 +341,6 @@ class NeuKron_TT:
                 temp_vec2 = torch.tensor(slices[i:i+curr_batch_size]).to(self.i_device)
                 dot_prod = temp_vec1 * temp_vec2
                 curr_idx = torch.arange(i,i+curr_batch_size, device=self.i_device)
-                
-                #print(proj_pts.dtype)
-                #print(dot_prod.dtype)
                 proj_pts.scatter_(0, curr_idx//slice_size, dot_prod, reduce='add')
         
         proj_pts = proj_pts.cpu().numpy()

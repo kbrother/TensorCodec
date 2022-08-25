@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import torch
 
 # Matrix
 class _mat:
@@ -17,11 +18,12 @@ class _mat:
         self.norm = math.sqrt(np.square(self.src_vals).sum())        
         self.base = []
         temp_base = 1
-        for i in range(self.order, -1, -1):
+        for i in range(self.order-1, -1, -1):
             self.base.insert(0, temp_base)
             temp_base *= self.src_dims[i]
-        self.base = torch.LongTensor(temp_base, device=device)
-        self.src_dims_gpu = torch.LongTensor(self.src_dims, device=device)
+        device = torch.device("cuda:" + str(device))
+        self.base = torch.tensor(self.base, dtype=torch.long, device=device)
+        self.src_dims_gpu = torch.tensor(self.src_dims, dtype=torch.long, device=device)
         print(f'norm of the tensor: {self.norm}')
 
     def extract_slice(self, curr_order, idx):

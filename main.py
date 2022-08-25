@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import math
 import sys
-from model import NeuKron_TT, TT
+from model import NeuKron_TT
 from data import _mat
 import copy
 
@@ -18,23 +18,31 @@ def test_perm(n_model, args):
             curr_loss += n_model.change_permutation(args.batch_size, 1)
         
         print(f'our loss: {curr_loss}, real loss:{n_model.L2_loss(False, args.batch_size)}')
-
+        
 def train_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))
     optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch)    
     max_fit = -sys.float_info.max
     n_model.model.train()
-    for epoch in range(args.epoch):
-        # change ordering
-        n_model.change_permutation(args.batch_size, 0)
-        n_model.change_permutation(args.batch_size, 1)
-                
+    minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
+    for epoch in range(args.epoch):                
         n_model.model.train()       
-        for i in tqdm(range(args.num_batch)):
+        curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
+        for i in tqdm(range(0, n_model.input_mat.real_num_entries, minibatch_size)):
+            if n_model.input_mat.real_num_entries - i < minibatch_size: 
+                curr_batch_size = n_model.input_mat.real_num_entries - i
+            else: curr_batch_size = minibatch_size
+            samples = curr_order[i:i+curr_batch_size]
+            
             optimizer.zero_grad()
-            mini_loss, mini_norm = n_model.L2_minibatch_loss(True, args.batch_size, args.num_batch)
+            mini_loss, mini_norm = n_model.L2_minibatch_loss(True, args.batch_size, samples)
             optimizer.step() 
-        
+        '''
+        optimizer.zero_grad()
+        curr_loss = n_model.L2_loss(True, args.batch_size)
+        optimizer.step() 
+        '''
+                
         with torch.no_grad():
             n_model.model.eval()
             curr_loss = n_model.L2_loss(False, args.batch_size)
@@ -87,7 +95,8 @@ def retrain(n_model, argss):
             }, args.save_path + ".pt")            
             
 
-# python main.py test_perm -d action_reorder -m 2 6 3 2 -n 2 6 3 2 -de 0 1 2 3 -rk 5 -hs 2
+# python main.py train -d uber -de 0 1 2 3 -rk 5 -hs 10 -sp results/uber/test -e 5000 -lr 1e-2
+# python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')
@@ -142,9 +151,9 @@ if __name__ == '__main__':
     # decompsress m_list and n_list
     with open("input_size/" + args.dataset + ".txt") as f:
         lines = f.read().split("\n")
-        input_size = [[int(word) for word in line.split()] for line in liens if line]        
+        input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat("../data/" + args.dataset + "_mat.npy", )        
+    input_mat = _mat("../data/" + args.dataset + ".npy", args.device[0])        
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
         train_model(n_model, args)
@@ -154,5 +163,17 @@ if __name__ == '__main__':
     elif args.action == "test_perm":
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)      
         test_perm(n_model, args)      
+    elif args.action == "check_sum":
+        n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)        
+        k = len(input_size[0])
+        first_mat = np.ones((1, args.rank))
+        middle_mat = np.ones((args.rank, args.rank))
+        final_mat = np.ones((args.rank, 1))
+        
+        gt_result = np.dot(first_mat, middle_mat)
+        for i in range(k-2):
+            gt_result = np.dot(gt_result, middle_mat)
+        gt_result = np.dot(gt_result, final_mat)
+        print(f'model sum: {n_model.entry_sum(args.batch_size)}, gt result: {gt_result.item()}')
     else:
         assert(False)
