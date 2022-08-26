@@ -4,6 +4,7 @@ from tqdm import tqdm
 import math
 import numpy as np
 import random
+import copy
 
 # Model
 class rnn_model(torch.nn.Module):
@@ -318,18 +319,21 @@ class NeuKron_TT:
     '''
     def hashing_euclid(self, curr_order, model_idx, num_bucket, batch_size):
         num_idx = model_idx.shape[0]
-        if curr_order == 0: slice_size = self.input_mat.src_ncol
-        else: slice_size = self.input_mat.src_nrow
+        slice_size = 1
+        for i in range(self.order):
+            if i ==  curr_order: continue
+            slice_size *= self.input_mat.src_dims[i]
+        
         curr_line = 5 * (np.random.rand(slice_size) - 0.5)
         curr_line = curr_line / np.linalg.norm(curr_line)
         curr_lines = np.tile(curr_line, num_idx)
         proj_pts = [0 for _ in range(num_idx)]
         
         # Build repeated long vector for the current line
-        slices = self.input_mat.extract_slice(curr_order, self.perm_list[curr_order][model_idx[0]].item())         
-        for i in range(1, num_idx):
+        slices = np.zeros(slice_size*num_idx)        
+        for i in range(num_idx):
             curr_slice = self.input_mat.extract_slice(curr_order, self.perm_list[curr_order][model_idx[i]].item())            
-            slices = np.concatenate((slices, curr_slice))
+            slices[slice_size*i: slice_size*(i+1)] = curr_slice
         
         proj_pts = torch.zeros(num_idx, dtype=torch.double).to(self.i_device)
         with torch.no_grad():
@@ -359,8 +363,7 @@ class NeuKron_TT:
     def change_permutation(self, batch_size, curr_order):
         # Hashing
         _matrix = self.input_mat
-        if curr_order == 0: curr_dim = _matrix.src_nrow
-        else: curr_dim = _matrix.src_ncol
+        curr_dim = _matrix.src_dims[curr_order]
         
         num_pair = curr_dim//2
         _temp = (curr_dim-2)//2 + 1
@@ -401,14 +404,30 @@ class NeuKron_TT:
         first_elem, second_elem = torch.tensor(first_elem, dtype=torch.long, device=self.i_device), torch.tensor(second_elem, dtype=torch.long, device=self.i_device) 
         
         # Initialize variables
-        if curr_order == 0: num_slice_entry = _matrix.src_ncol
-        else: num_slice_entry = _matrix.src_nrow
+        num_slice_entry = 1
+        for i in range(self.order):
+            if i == curr_order: continue
+            num_slice_entry *= self.input_mat.src_dims[i]
         loss_list = torch.zeros(num_pair, device=self.i_device, dtype=torch.double)
        
         # Compute the loss change
         self.model.eval()
         num_total_entry = num_pair * num_slice_entry
         delta_loss, curr_idx = 0., 0
+        
+        # Preprocess
+        self.curr_src_base = []
+        temp_base = 1
+        for i in range(self.order-1, -1, -1):
+            if i == curr_order: continue                
+            self.curr_src_base.insert(0, temp_base)
+            temp_base *= self.input_mat.src_dims[i]            
+        self.curr_src_base = torch.tensor(self.curr_src_base, device=self.i_device)
+        self.curr_src_dims = copy.deepcopy(self.input_mat.src_dims)
+        self.curr_src_dims.pop(curr_order)
+        self.curr_src_dims = torch.tensor(self.curr_src_dims, device=self.i_device)
+        self.curr_src_base, self.curr_src_dims = self.curr_src_base.unsqueeze(0), self.curr_src_dims.unsqueeze(0)
+                                          
         with torch.no_grad():
             while curr_idx < num_total_entry:
                 if batch_size > num_total_entry - curr_idx: curr_batch_size = num_total_entry - curr_idx
@@ -425,8 +444,8 @@ class NeuKron_TT:
                 # Initialize preds and vals
                 vals0 = torch.empty(curr_batch_size, dtype=torch.double, device=self.i_device)
                 vals1 = torch.empty(curr_batch_size, dtype=torch.double, device=self.i_device)  
-                rows0, cols0 = torch.zeros(curr_batch_size, dtype=torch.long, device=self.i_device), torch.zeros(curr_batch_size, dtype=torch.long, device=self.i_device)
-                rows1, cols1 = torch.zeros(curr_batch_size, dtype=torch.long, device=self.i_device), torch.zeros(curr_batch_size, dtype=torch.long, device=self.i_device) 
+                model_idx0 = torch.zeros((curr_batch_size, self.order), dtype=torch.long, device=self.i_device)                
+                model_idx1 = torch.zeros((curr_batch_size, self.order), dtype=torch.long, device=self.i_device)                
                 batch_idx, chunk_size = 0, 0
                 for i in range(pair_start_idx, pair_end_idx):
                     # Extract value
@@ -446,31 +465,21 @@ class NeuKron_TT:
                     
                     # Extract Row and column indices
                     _temp = torch.arange(curr_start_idx, curr_end_idx, dtype=torch.long, device=self.i_device)
-                    if curr_order == 0:
-                        rows0[batch_idx: batch_idx+chunk_size] = first_elem[i]
-                        rows1[batch_idx: batch_idx+chunk_size] = second_elem[i]
-                                                
-                        cols0[batch_idx: batch_idx+chunk_size] = self.inv_perm_list[1][_temp]
-                        cols1[batch_idx: batch_idx+chunk_size] = self.inv_perm_list[1][_temp]
-                    else:
-                        rows0[batch_idx: batch_idx+chunk_size] = self.inv_perm_list[0][_temp]
-                        rows1[batch_idx: batch_idx+chunk_size] = self.inv_perm_list[0][_temp]
-                        
-                        cols0[batch_idx: batch_idx+chunk_size] = first_elem[i]
-                        cols1[batch_idx: batch_idx+chunk_size] = second_elem[i]
-                    
+                    _temp = _temp.unsqueeze(-1) // self.curr_src_base % self.curr_src_dims  # batch size x self.order-1
+                    for j in range(self.order):
+                        if j == curr_order:                            
+                            model_idx0[batch_idx:batch_idx+chunk_size, j] = first_elem[i]
+                            model_idx1[batch_idx:batch_idx+chunk_size, j] = second_elem[i]
+                        elif j < curr_order:
+                            model_idx0[batch_idx:batch_idx+chunk_size, j] = self.inv_perm_list[j][_temp[:, j]]
+                            model_idx1[batch_idx:batch_idx+chunk_size, j] = self.inv_perm_list[j][_temp[:, j]]
+                        else:
+                            model_idx0[batch_idx:batch_idx+chunk_size, j] = self.inv_perm_list[j][_temp[:, j-1]]
+                            model_idx1[batch_idx:batch_idx+chunk_size, j] = self.inv_perm_list[j][_temp[:, j-1]]                    
                     batch_idx += chunk_size
                 
-                # Build inputs
-                rows0 = rows0.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
-                cols0 = cols0.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
-                input0 = rows0 * self.n_list + cols0 + self._add
-                output0 = self.model(input0)
-                
-                rows1 = rows1.unsqueeze(-1) // self.row_bases % self.m_list  # batch size x self.k
-                cols1 = cols1.unsqueeze(-1) // self.col_bases % self.n_list   # batch size x self.k                
-                input1 = rows1 * self.n_list + cols1 + self._add
-                output1 = self.model(input1)
+                # Build inputs                
+                output0, output1 = self.predict(model_idx0), self.predict(model_idx1)                
                 loss_list.scatter_(0, pair_idx, -torch.square(output0-vals0)-torch.square(output1-vals1), reduce='add')
                 loss_list.scatter_(0, pair_idx, torch.square(output0-vals1)+torch.square(output1-vals0), reduce='add')
                 

@@ -40,4 +40,4 @@ class _mat:
         curr_input = [slice(None) for _ in range(self.order)]
         curr_input[curr_order] = idx
         curr_input = tuple(curr_input)
-        return self.src_matrix[curr_input]
+        return self.src_tensor[curr_input].flatten()

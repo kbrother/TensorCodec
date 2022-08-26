@@ -97,6 +97,7 @@ def retrain(n_model, argss):
 
 # python main.py train -d uber -de 0 1 2 3 -rk 5 -hs 10 -sp results/uber/test -e 5000 -lr 1e-2
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
+# python main.py test_perm -d uber -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')
@@ -161,7 +162,7 @@ if __name__ == '__main__':
         n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)        
         retrain(n_model, args)        
     elif args.action == "test_perm":
-        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)      
+        n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)      
         test_perm(n_model, args)      
     elif args.action == "check_sum":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)        
