@@ -427,7 +427,8 @@ class NeuKron_TT:
         self.curr_src_dims.pop(curr_order)
         self.curr_src_dims = torch.tensor(self.curr_src_dims, device=self.i_device)
         self.curr_src_base, self.curr_src_dims = self.curr_src_base.unsqueeze(0), self.curr_src_dims.unsqueeze(0)
-                                          
+                             
+        pbar = tqdm(total=num_total_entry)
         with torch.no_grad():
             while curr_idx < num_total_entry:
                 if batch_size > num_total_entry - curr_idx: curr_batch_size = num_total_entry - curr_idx
@@ -484,7 +485,9 @@ class NeuKron_TT:
                 loss_list.scatter_(0, pair_idx, torch.square(output0-vals1)+torch.square(output1-vals0), reduce='add')
                 
                 curr_idx += curr_batch_size
+                pbar.update(curr_batch_size)
         
+            pbar.close()
             target_pair = loss_list < 0
             delta_loss = loss_list[target_pair].sum().item()
             first_model_idx, second_model_idx = first_elem[target_pair].clone(), second_elem[target_pair].clone()

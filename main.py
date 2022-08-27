@@ -25,7 +25,10 @@ def train_model(n_model, args):
     max_fit = -sys.float_info.max
     n_model.model.train()
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
-    for epoch in range(args.epoch):                
+    for epoch in range(args.epoch):              
+        n_model.model.eval()
+        n_model.change_permutation(args.batch_size, 1)
+        
         n_model.model.train()       
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
         for i in tqdm(range(0, n_model.input_mat.real_num_entries, minibatch_size)):
