@@ -40,6 +40,7 @@ def train_model(n_model, args):
         
         n_model.model.eval()
         n_model.change_permutation(args.batch_size, 1)
+        n_model.change_permutation(args.batch_size, 2)
         '''
         optimizer.zero_grad()
         curr_loss = n_model.L2_loss(True, args.batch_size)
