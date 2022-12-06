@@ -98,8 +98,7 @@ def retrain(n_model, argss):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-
-# python main.py train -d uber -de 0 1 2 3 -rk 5 -hs 10 -sp results/uber/test -e 5000 -lr 1e-2
+# python root/22-TT-train/main.py train -d absorb -de 0 1 -rk 5 -hs 10 -sp results/absorb/r5_h10 -e 5000 -lr 1e-2
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 # python main.py test_perm -d uber -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
@@ -154,11 +153,12 @@ if __name__ == '__main__':
     
     args = parser.parse_args()      
     # decompsress m_list and n_list
-    with open("input_size/" + args.dataset + ".txt") as f:
+    with open("root/22-TT-train/input_size/" + args.dataset + ".txt") as f:
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat(input_size, "../data/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "input/NeuTT/" + args.dataset + ".npy", args.device[0])        
+    print("load finish")
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
         train_model(n_model, args)
