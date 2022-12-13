@@ -28,7 +28,7 @@ def train_model(n_model, args):
     for epoch in range(args.epoch):                      
         n_model.model.train()       
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
-        for i in tqdm(range(0, n_model.input_mat.real_num_entries, minibatch_size)):
+        for i in range(0, n_model.input_mat.real_num_entries, minibatch_size):
             if n_model.input_mat.real_num_entries - i < minibatch_size: 
                 curr_batch_size = n_model.input_mat.real_num_entries - i
             else: curr_batch_size = minibatch_size
@@ -39,8 +39,9 @@ def train_model(n_model, args):
             optimizer.step() 
         
         n_model.model.eval()
-        n_model.change_permutation(args.batch_size, 1)
-        n_model.change_permutation(args.batch_size, 2)
+        for _dim in range(n_model.order):
+            n_model.change_permutation(args.batch_size, _dim)
+        
         '''
         optimizer.zero_grad()
         curr_loss = n_model.L2_loss(True, args.batch_size)
@@ -98,7 +99,7 @@ def retrain(n_model, argss):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-# python root/22-TT-train/main.py train -d absorb -de 0 1 -rk 5 -hs 10 -sp results/absorb/r5_h10 -e 5000 -lr 1e-2
+# python main.py train -d absorb -de 0 1 2 3 -rk 5 -hs 10 -sp results/absorb/r5_h10 -e 500 -lr 1e-2
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 # python main.py test_perm -d uber -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
@@ -128,7 +129,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-b", "--batch_size",
-        action="store", default=2**17, type=int
+        action="store", default=2**23, type=int
     )
     
     parser.add_argument(
@@ -153,11 +154,11 @@ if __name__ == '__main__':
     
     args = parser.parse_args()      
     # decompsress m_list and n_list
-    with open("root/22-TT-train/input_size/" + args.dataset + ".txt") as f:
+    with open("input_size/" + args.dataset + ".txt") as f:
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat(input_size, "input/NeuTT/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "../data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
