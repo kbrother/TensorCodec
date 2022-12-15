@@ -12,11 +12,13 @@ def test_perm(n_model, args):
     with torch.no_grad():
         n_model.model.eval()
         curr_loss = n_model.L2_loss(False, args.batch_size)
-        print(f'initial loss: {curr_loss}')
-        for i in tqdm(range(10)):
-            curr_loss += n_model.change_permutation(args.batch_size, 0)
-            curr_loss += n_model.change_permutation(args.batch_size, 1)
-        
+        print(f'initial loss: {curr_loss}')        
+        for i in range(1):
+            for j in range(4):
+                delta_loss = n_model.change_permutation(args.batch_size, j)
+                curr_loss += delta_loss
+                print(delta_loss)
+                
         print(f'our loss: {curr_loss}, real loss:{n_model.L2_loss(False, args.batch_size)}')
         
 def train_model(n_model, args):
@@ -28,7 +30,7 @@ def train_model(n_model, args):
     for epoch in range(args.epoch):                      
         n_model.model.train()       
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
-        for i in range(0, n_model.input_mat.real_num_entries, minibatch_size):
+        for i in tqdm(range(0, n_model.input_mat.real_num_entries, minibatch_size)):
             if n_model.input_mat.real_num_entries - i < minibatch_size: 
                 curr_batch_size = n_model.input_mat.real_num_entries - i
             else: curr_batch_size = minibatch_size
@@ -39,8 +41,8 @@ def train_model(n_model, args):
             optimizer.step() 
         
         n_model.model.eval()
-        for _dim in range(n_model.order):
-            n_model.change_permutation(args.batch_size, _dim)
+        #for _dim in range(n_model.order):
+        #    n_model.change_permutation(args.batch_size, _dim)
         
         '''
         optimizer.zero_grad()
@@ -99,9 +101,9 @@ def retrain(n_model, argss):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-# python main.py train -d absorb -de 0 1 2 3 -rk 5 -hs 10 -sp results/absorb/r5_h10 -e 500 -lr 1e-2
+# python main.py train -d absorb_large -de 0 1 2 3 -rk 5 -hs 10 -sp results/absorb_large/r5_h10 -e 100 -lr 1e-1
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
-# python main.py test_perm -d uber -de 0 1 2 3 -rk 5 -hs 10 
+# python main.py test_perm -d absrob -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')

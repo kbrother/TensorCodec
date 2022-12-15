@@ -288,7 +288,7 @@ class NeuKron_TT:
         return_loss, minibatch_norm = 0., 0.
         num_sample = samples.shape[0]
         # Indices of sampled matrix entries        
-        for i in tqdm(range(0, num_sample, batch_size)):
+        for i in range(0, num_sample, batch_size):
             with torch.no_grad():
                 curr_batch_size = min(batch_size, num_sample - i)
                 curr_ten_idx = samples[i:i+curr_batch_size]
