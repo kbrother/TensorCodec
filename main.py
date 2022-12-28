@@ -27,6 +27,10 @@ def train_model(n_model, args):
     max_fit = -sys.float_info.max
     n_model.model.train()
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
+    
+    with open(args.save_path + ".txt", 'a') as lossfile:
+        lossfile.write(f'num params: {self.num_params}\n')    
+        
     for epoch in range(args.epoch):                      
         n_model.model.train()       
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
@@ -71,7 +75,7 @@ def train_model(n_model, args):
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
 
     
-def retrain(n_model, argss):
+def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
     n_model.model.load_state_dict(checkpoint['model_state_dict'])
     device = torch.device("cuda:" + str(args.device[0]))
@@ -112,6 +116,11 @@ if __name__ == '__main__':
     parser.add_argument(
         "-de", "--device",
         action="store", nargs='+', type=int
+    )    
+    
+    parser.add_argument(
+        "-p", "--perms",
+        action="store", default=[], nargs='+', type=int
     )    
     
     parser.add_argument(

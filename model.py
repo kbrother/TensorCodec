@@ -210,14 +210,14 @@ class NeuKron_TT:
         for i in range(self.k):
             curr_input = tuple([input_size[j][i] for j in range(self.order)])
             self._add.append(input_size_dict[curr_input])
-        print(self._add)    
+        #print(self._add)    
         # move to gpu
         for i in range(self.order):
             self.input_size[i] = torch.tensor(self.input_size[i], dtype=torch.long, device=self.i_device)  # order x k    
             self.bases_list[i] = torch.tensor(self.bases_list[i], dtype=torch.long, device=self.i_device)  # order x k
         self._add = torch.tensor(self._add, dtype=torch.long, device=self.i_device).unsqueeze(0)                
-        
-        print(f"The number of params:{ sum(p.numel() for p in self.model.parameters() if p.requires_grad)}")
+        self.num_params =  sum(p.numel() for p in self.model.parameters() if p.requires_grad)        
+        print(f"The number of params:{self.num_params}")
         # model -> matrix
         self.perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
         # matrix -> model
