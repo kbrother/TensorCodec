@@ -140,7 +140,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-b", "--batch_size",
-        action="store", default=2**23, type=int
+        action="store", default=2**22, type=int
     )
     
     parser.add_argument(
