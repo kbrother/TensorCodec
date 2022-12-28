@@ -29,7 +29,7 @@ def train_model(n_model, args):
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
     
     with open(args.save_path + ".txt", 'a') as lossfile:
-        lossfile.write(f'num params: {self.num_params}\n')    
+        lossfile.write(f'num params: {n_model.num_params}\n')    
         
     for epoch in range(args.epoch):                      
         n_model.model.train()       
@@ -45,8 +45,8 @@ def train_model(n_model, args):
             optimizer.step() 
         
         n_model.model.eval()
-        #for _dim in range(n_model.order):
-        #    n_model.change_permutation(args.batch_size, _dim)
+        for _dim in args.perms:
+            n_model.change_permutation(args.batch_size, _dim)
         
         '''
         optimizer.zero_grad()
