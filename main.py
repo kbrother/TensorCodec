@@ -31,6 +31,7 @@ def train_model(n_model, args):
     with open(args.save_path + ".txt", 'a') as lossfile:
         lossfile.write(f'num params: {n_model.num_params}\n')    
         
+    tol_count = 0
     for epoch in range(args.epoch):                      
         n_model.model.train()       
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
@@ -47,17 +48,14 @@ def train_model(n_model, args):
         n_model.model.eval()
         for _dim in args.perms:
             n_model.change_permutation(args.batch_size, _dim)
-        
-        '''
-        optimizer.zero_grad()
-        curr_loss = n_model.L2_loss(True, args.batch_size)
-        optimizer.step() 
-        '''
-                
+                        
         with torch.no_grad():
             n_model.model.eval()
             curr_loss = n_model.L2_loss(False, args.batch_size)
             curr_fit = 1 - math.sqrt(curr_loss)/n_model.input_mat.norm
+            
+            if max_fit + 1e-4 <= curr_fit: tol_count = 0
+            else: tol_count += 1
             if max_fit < curr_fit:
                 max_fit = curr_fit
                 opt_state_dict = copy.deepcopy(optimizer.state_dict())
@@ -69,11 +67,11 @@ def train_model(n_model, args):
                     'loss': curr_fit,
                     'perm': n_model.perm_list
                 }, args.save_path + ".pt")
-
+            
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
-
+        if tol_count >= 20: break
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
