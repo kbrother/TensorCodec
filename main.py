@@ -71,7 +71,7 @@ def train_model(n_model, args):
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
-        if tol_count >= 20: break
+        #if tol_count >= 20: break
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
