@@ -46,7 +46,7 @@ def train_model(n_model, args):
             optimizer.step() 
         
         n_model.model.eval()
-        for _dim in args.perms:
+        for _dim in range(n_model.order):
             n_model.change_permutation(args.batch_size, _dim)
                         
         with torch.no_grad():
@@ -71,7 +71,7 @@ def train_model(n_model, args):
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
-        #if tol_count >= 20: break
+        if tol_count >= 20: break
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
@@ -116,10 +116,12 @@ if __name__ == '__main__':
         action="store", nargs='+', type=int
     )    
     
+    '''
     parser.add_argument(
         "-p", "--perms",
         action="store", default=[], nargs='+', type=int
-    )    
+    )  
+    '''
     
     parser.add_argument(
         "-rk", "--rank",
