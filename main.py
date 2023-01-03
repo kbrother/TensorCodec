@@ -22,8 +22,7 @@ def test_perm(n_model, args):
         print(f'our loss: {curr_loss}, real loss:{n_model.L2_loss(False, args.batch_size)}')
         
 def train_model(n_model, args):
-    device = torch.device("cuda:" + str(args.device[0]))
-    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch)    
+    device = torch.device("cuda:" + str(args.device[0]))   
     max_fit = -sys.float_info.max
     n_model.model.train()
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
@@ -32,8 +31,9 @@ def train_model(n_model, args):
         lossfile.write(f'num params: {n_model.num_params}\n')    
         
     tol_count = 0
-    for epoch in range(args.epoch):                      
-        n_model.model.train()       
+    for epoch in range(args.epoch): 
+        optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch) 
+        n_model.model.train()               
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
         for i in tqdm(range(0, n_model.input_mat.real_num_entries, minibatch_size)):
             if n_model.input_mat.real_num_entries - i < minibatch_size: 
@@ -57,13 +57,11 @@ def train_model(n_model, args):
             if max_fit + 1e-4 <= curr_fit: tol_count = 0
             else: tol_count += 1
             if max_fit < curr_fit:
-                max_fit = curr_fit
-                opt_state_dict = copy.deepcopy(optimizer.state_dict())
+                max_fit = curr_fit                
                 prev_model = copy.deepcopy(n_model.model.state_dict())
                 torch.save({
                     'epoch': epoch,
-                    'model_state_dict': prev_model,
-                    'optimizer_state_dict': opt_state_dict,
+                    'model_state_dict': prev_model,                    
                     'loss': curr_fit,
                     'perm': n_model.perm_list
                 }, args.save_path + ".pt")
