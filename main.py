@@ -24,6 +24,7 @@ def test_perm(n_model, args):
 def train_model(n_model, args):
     device = torch.device("cuda:" + str(args.device[0]))   
     max_fit = -sys.float_info.max
+    prev_fit = -1
     n_model.model.train()
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
     
@@ -54,8 +55,11 @@ def train_model(n_model, args):
             curr_loss = n_model.L2_loss(False, args.batch_size)
             curr_fit = 1 - math.sqrt(curr_loss)/n_model.input_mat.norm
             
-            if max_fit + 1e-4 <= curr_fit: tol_count = 0
+            if prev_fit + 1e-4 <= curr_fit: 
+                tol_count = 0
+                prev_fit = curr_fit
             else: tol_count += 1
+                
             if max_fit < curr_fit:
                 max_fit = curr_fit                
                 prev_model = copy.deepcopy(n_model.model.state_dict())
@@ -69,7 +73,7 @@ def train_model(n_model, args):
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
-        if tol_count >= 20: break
+        if tol_count >= 10: break
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
