@@ -377,6 +377,8 @@ class NeuKron_TT:
         #print(bucket_idx.size)
         #print(num_pair)
         for i in range(num_pair):            
+            if bucket_idx[i] >= len(buckets):
+                print(f'{bucket_idx[i]}, {len(buckets)}')
             buckets[bucket_idx[i]].append(model_idx[i])
         if curr_dim % 2 == 1: remains = [curr_dim - 1]
         else: remains = []
