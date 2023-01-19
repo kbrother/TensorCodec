@@ -171,7 +171,7 @@ if __name__ == '__main__':
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
