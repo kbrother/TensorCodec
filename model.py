@@ -351,8 +351,10 @@ class NeuKron_TT:
                 
         seg_len = (max_point - min_point) / (num_bucket - 1)
         start_point = random.uniform(min_point - seg_len, min_point)
+        if start_point < (min_point - seg_len):
+            start_point = min_point - seg_len + 1e-16
         bucket_idx = proj_pts.copy()
-        print(f'min: {min_point}, max: {max_point}, seg_len: {seg_len}, start point: {start_point}, max point: {(max_point-start_point) // seg_len}')
+        #print(f'min: {min_point}, max: {max_point}, seg_len: {seg_len}, start point: {start_point}, max point: {(max_point-start_point) // seg_len}')
         for i in range(num_idx):
             bucket_idx[i] = int((proj_pts[i] - start_point) // seg_len)
             
