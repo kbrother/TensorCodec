@@ -354,7 +354,7 @@ class NeuKron_TT:
         if start_point < (min_point - seg_len):
             start_point = min_point - seg_len + 1e-16
         bucket_idx = proj_pts.copy()
-        #print(f'min: {min_point}, max: {max_point}, seg_len: {seg_len}, start point: {start_point}, max point: {(max_point-start_point) // seg_len}')
+        print(f'min: {min_point}, max: {max_point}, seg_len: {seg_len}, start point: {start_point}, max point: {(max_point-start_point) // seg_len}')
         for i in range(num_idx):
             bucket_idx[i] = int((proj_pts[i] - start_point) // seg_len)
             
