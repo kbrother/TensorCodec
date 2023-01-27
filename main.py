@@ -73,7 +73,7 @@ def train_model(n_model, args):
         with open(args.save_path + ".txt", 'a') as lossfile:
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
-        if tol_count >= 10: break
+        if tol_count >= args.tol: break
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
@@ -163,6 +163,11 @@ if __name__ == '__main__':
     parser.add_argument(
         "-hs", "--hidden_size",
         action="store", default=11, type=int
+    )
+    
+    parser.add_argument(
+        "-t", "--tol", 
+        actions="store", default=10, type=int
     )
     
     args = parser.parse_args()      
