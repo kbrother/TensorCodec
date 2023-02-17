@@ -375,7 +375,11 @@ class NeuKron_TT:
         _temp = (curr_dim-2)//2 + 1
         model_idx = 2*np.arange(_temp) + np.random.randint(2, size=_temp)
         num_bucket = curr_dim // 8
-        bucket_idx = self.hashing_euclid(curr_order, model_idx, num_bucket, batch_size)
+        if num_bucket <= 1: 
+            num_bucket = 1
+            bucket_idx = [0 for _ in range(_temp)]
+        else:
+            bucket_idx = self.hashing_euclid(curr_order, model_idx, num_bucket, batch_size)
                 
         # Build bucket
         buckets = [[] for _ in range(num_bucket)]
