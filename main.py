@@ -7,6 +7,7 @@ import sys
 from model import NeuKron_TT
 from data import _mat
 import copy
+import time
 
 def test_perm(n_model, args):
     with torch.no_grad():
@@ -32,6 +33,7 @@ def train_model(n_model, args):
         lossfile.write(f'num params: {n_model.num_params}\n')    
         
     tol_count = 0
+    start_time = time.time()
     for epoch in range(args.epoch): 
         optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch) 
         n_model.model.train()               
@@ -74,6 +76,11 @@ def train_model(n_model, args):
             lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
             print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
         if tol_count >= args.tol: break
+    
+    end_time = time.time()
+    with open(args.save_path + ".txt", 'a') as lossfile:
+        lossfile.write(f'running time: {end_time - start_time}\n')    
+    print(f'running time: {end_time - start_time}')
     
 def retrain(n_model, args):
     checkpoint = torch.load(args.load_path)
@@ -177,6 +184,7 @@ if __name__ == '__main__':
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
     input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
+    #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
         n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
