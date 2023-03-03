@@ -22,7 +22,7 @@ class rnn_model(torch.nn.Module):
         self.rnn = nn.LSTM(hidden_size, hidden_size)
         self.hidden_size = hidden_size        
         self.order = len(input_size)
-        self.batch_norm = nn.BatchNorm1d(hidden_size)
+        #self.batch_norm = nn.BatchNorm1d(hidden_size)
         
         input_set = set()
         for i in range(self.k):
@@ -47,9 +47,9 @@ class rnn_model(torch.nn.Module):
         self.rnn.flatten_parameters()
         rnn_output, _ = self.rnn(_input)   # seq len x batch size x hidden dim 
         
-        rnn_output = torch.reshape(rnn_output, (batch_size, self.hidden_size, seq_len))
-        rnn_output = self.batch_norm(rnn_output)
-        rnn_output = torch.reshape(rnn_output, (seq_len, batch_size, self.hidden_size))
+        #rnn_output = torch.reshape(rnn_output, (batch_size, self.hidden_size, seq_len))
+        #rnn_output = self.batch_norm(rnn_output)
+        #rnn_output = torch.reshape(rnn_output, (seq_len, batch_size, self.hidden_size))
         
         first_mat = self.layer_first(rnn_output[0,:,:])   
         final_mat = self.layer_final(rnn_output[-1,:,:])   # batch size x R
