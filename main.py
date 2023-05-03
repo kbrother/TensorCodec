@@ -179,11 +179,11 @@ if __name__ == '__main__':
     
     args = parser.parse_args()      
     # decompsress m_list and n_list
-    with open("22-TT-train/input_size/" + args.dataset + ".txt") as f:
+    with open("TensorCodec/input_size/" + args.dataset + ".txt") as f:
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "input/" + args.dataset + ".npy", args.device[0])        
     #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
