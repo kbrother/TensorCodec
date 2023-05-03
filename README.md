@@ -1,4 +1,28 @@
-# TensorCodec
+# TensorCodec: Compact Lossy Compression of Tensors without Strong Assumptions on Data Properties
+This repository is the official implementation of TensorCodec: Compact Lossy Compression of Tensors without Strong Assumptions on Data Properties (anonymized).
+
+## Requirements
+* To run the provided codes, you need to install `PyTorch`. Since the installation commands for the package rely on the environments, please visit the page (https://pytorch.org/get-started/locally/) for guideline to install the package.
+
+* The code should be run on the folder (`./`) which includes the `TensorCodec` folder. The dataset files should be located in `./input`.
+
+## Arguments for training and evluation
+### Positional argument
+* `action`: `train` for compressing the matrix.
+* `-d`, `--dataset`: data to be compressed
+
+### Optional arguments (common)
+* `-de`, `--device`: GPU id(s) for execution.
+* `-rk`, `--rank`: rank of TT cores.
+* `-hs`, `--hidden_size`: hidden size of LSTM.
+
+### Optional arguments (for training)
+* `-lr`, `--lr`: learning rate.
+* `-e`, `--epoch`: maximum numbers of epoch.
+* `-b', `--batch_size`: number of entries of tensors parallely processed by GPU when computing the loss.
+* `-nb`, `--num_batch`: the number of mini-batches used to compress a tensor (train a model).
+* `-sp`, `--save_path`: path for saving the parameters of the trained model and the new orders of the indices of the tensor (bijecive fuction from indices of the reordred tensor to the indices of the original tensor).
+* `-tol`, `--tol`: tolerance for training.
 
 ## Real-world datasets we used
 
