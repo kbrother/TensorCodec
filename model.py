@@ -172,7 +172,7 @@ class sum_model(torch.nn.Module):
         return total_output.squeeze()
     
     
-class NeuKron_TT:
+class TensorCodec:
     '''
         input_size: list of list that saves the size of inputs of all levels for each mode,
         order x k 

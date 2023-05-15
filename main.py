@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import math
 import sys
-from model import NeuKron_TT
+from model import TensorCodec
 from data import _mat
 import copy
 import time
@@ -112,7 +112,7 @@ def retrain(n_model, args):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-# python 22-TT-train/main.py train -d turb -de 3 -rk 5 -hs 10 -sp output/turb -e 100 -lr 1e-1
+# python 22-TT-train/main.py train -d uber -de 0 1 2 3 -rk 5 -hs 10 -sp output/uber -e 100 -lr 1e-1
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 # python main.py test_perm -d absrob -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
@@ -187,16 +187,16 @@ if __name__ == '__main__':
     #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
-        n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)
         train_model(n_model, args)
     elif args.action == "retrain":
-        n_model = NeuKron_TT(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)        
+        n_model = TensorCodec(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)        
         retrain(n_model, args)        
     elif args.action == "test_perm":
-        n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)      
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)      
         test_perm(n_model, args)      
     elif args.action == "check_sum":
-        n_model = NeuKron_TT(input_mat, args.rank, input_size, args.hidden_size, args.device)        
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)        
         k = len(input_size[0])
         first_mat = np.ones((1, args.rank))
         middle_mat = np.ones((args.rank, args.rank))
