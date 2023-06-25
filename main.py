@@ -112,7 +112,7 @@ def retrain(n_model, args):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-# python 22-TT-train/main.py train -d uber -de 0 1 2 3 -rk 5 -hs 10 -sp output/uber -e 100 -lr 1e-1
+# python TensorCodec/main.py train -d uber -de 0 1 2 3 -rk 7 -hs 10 -sp output/uber -e 100 -lr 1e-1 -m gru
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 # python main.py test_perm -d absrob -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
@@ -177,6 +177,11 @@ if __name__ == '__main__':
         action="store", default=10, type=int
     )
     
+    parser.add_argument(
+        "-m", "--model",
+        action="store", default="lstm", type=str
+    )
+    
     args = parser.parse_args()      
     # decompsress m_list and n_list
     with open("TensorCodec/input_size/" + args.dataset + ".txt") as f:
@@ -187,16 +192,16 @@ if __name__ == '__main__':
     #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
-        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)
         train_model(n_model, args)
     elif args.action == "retrain":
-        n_model = TensorCodec(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device)        
+        n_model = TensorCodec(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device, args.model)        
         retrain(n_model, args)        
     elif args.action == "test_perm":
-        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)      
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)      
         test_perm(n_model, args)      
     elif args.action == "check_sum":
-        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device)        
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)        
         k = len(input_size[0])
         first_mat = np.ones((1, args.rank))
         middle_mat = np.ones((args.rank, args.rank))

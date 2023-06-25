@@ -12,14 +12,18 @@ class rnn_model(torch.nn.Module):
         input_size: list of list that saves the size of inputs of all levels for each mode
         order x k
     '''
-    def __init__(self, rank, input_size, hidden_size):
+    def __init__(self, rank, input_size, hidden_size, model_type):
         super(rnn_model, self).__init__()
         self.rank = rank
         self.k = len(input_size[0])
         self.layer_first = nn.Linear(hidden_size, rank)
         self.layer_middle = nn.Linear(hidden_size, rank*rank)
         self.layer_final = nn.Linear(hidden_size, rank)        
-        self.rnn = nn.LSTM(hidden_size, hidden_size)
+        
+        if model_type == "lstm": self.rnn = nn.LSTM(hidden_size, hidden_size)
+        elif model_type == "gru": self.rnn = nn.GRU(hidden_size, hidden_size)
+        else: raise TypeError("Wrong model type") 
+            
         self.hidden_size = hidden_size        
         self.order = len(input_size)
         #self.batch_norm = nn.BatchNorm1d(hidden_size)
@@ -177,7 +181,7 @@ class TensorCodec:
         input_size: list of list that saves the size of inputs of all levels for each mode,
         order x k 
     '''
-    def __init__(self, input_mat, rank, input_size, hidden_size, device):
+    def __init__(self, input_mat, rank, input_size, hidden_size, device, model_type):
         # Intialize parameters
         self.input_mat = input_mat
         self.input_size = input_size
@@ -186,7 +190,7 @@ class TensorCodec:
         self.hidden_size = hidden_size
         self.device = device
         self.i_device = torch.device("cuda:" + str(self.device[0]))
-        self.model = rnn_model(rank, input_size, hidden_size)
+        self.model = rnn_model(rank, input_size, hidden_size, model_type)
         self.model.double()     
         if len(self.device) > 1:
             self.model = nn.DataParallel(self.model, device_ids = self.device)                        
