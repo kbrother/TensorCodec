@@ -112,7 +112,7 @@ def retrain(n_model, args):
                 'loss': prev_loss
             }, args.save_path + ".pt")            
             
-# python TensorCodec/main.py train -d uber -de 0 1 2 3 -rk 7 -hs 10 -sp output/uber -e 100 -lr 1e-1 -m gru
+# python TensorCodec/main.py train -d uber -de 0 1 2 3 -rk 7 -hs 9 -sp output/uber1_r7_h9 -e 5000 -lr 1e-1 -m gru -nb 100 -t 100 -b 8388608
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
 # python main.py test_perm -d absrob -de 0 1 2 3 -rk 5 -hs 10 
 if __name__ == '__main__':    
@@ -188,7 +188,7 @@ if __name__ == '__main__':
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
                 
-    input_mat = _mat(input_size, "input/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
     #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
