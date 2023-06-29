@@ -1,5 +1,5 @@
-# TensorCodec: Compact Lossy Compression of Tensors without Strong Assumptions on Data Properties
-This repository is the official implementation of TensorCodec: Compact Lossy Compression of Tensors without Strong Assumptions on Data Properties (anonymized).
+# TensorCodec: Compact Lossy Compression of Tensors without Strong Data Assumptions
+This repository is the official implementation of TensorCodec: Compact Lossy Compression of Tensors without Strong Data Assumptions (anonymized).
 
 ## Requirements
 * To run the provided codes, you need to install `PyTorch`. Since the installation commands for the package rely on the environments, please visit the page (https://pytorch.org/get-started/locally/) for guideline to install the package.
