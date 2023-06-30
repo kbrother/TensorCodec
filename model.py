@@ -1,4 +1,4 @@
-from torch import nn
+from torch import nn, Tensor
 import torch
 from tqdm import tqdm
 import math
@@ -6,6 +6,27 @@ import numpy as np
 import random
 import copy
 
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Arguments:
+            x: Tensor, shape ``[seq_len, batch_size, embedding_dim]``
+        """
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+    
 # Model
 class rnn_model(torch.nn.Module):
     '''
@@ -19,9 +40,13 @@ class rnn_model(torch.nn.Module):
         self.layer_first = nn.Linear(hidden_size, rank)
         self.layer_middle = nn.Linear(hidden_size, rank*rank)
         self.layer_final = nn.Linear(hidden_size, rank)        
+        self.model_type = model_type
         
         if model_type == "lstm": self.rnn = nn.LSTM(hidden_size, hidden_size)
         elif model_type == "gru": self.rnn = nn.GRU(hidden_size, hidden_size)
+        elif model_type == "mha": 
+            self.rnn = nn.MultiheadAttention(hidden_size, 1)
+            self.pos_encoder = PositionalEncoding(hidden_size, max_len=self.k)
         else: raise TypeError("Wrong model type") 
             
         self.hidden_size = hidden_size        
@@ -48,8 +73,16 @@ class rnn_model(torch.nn.Module):
         _input = _input.transpose(0, 1)
         seq_len, batch_size = _input.size()
         _input = self.emb(_input)   # seq len x batch size x hidden dim                
-        self.rnn.flatten_parameters()
-        rnn_output, _ = self.rnn(_input)   # seq len x batch size x hidden dim 
+        if self.model_type != "mha":
+            self.rnn.flatten_parameters()
+        
+        if self.model_type == "mha":        
+            curr_mask = torch.ones((seq_len,seq_len), dtype=torch.bool, device=_input.device)
+            curr_mask = torch.triu(curr_mask, diagonal=1)
+            _device = _input.device
+            rnn_output, _ = self.rnn(_input, _input, _input, attn_mask=curr_mask)
+        else:
+            rnn_output, _ = self.rnn(_input)   # seq len x batch size x hidden dim 
         
         #rnn_output = torch.reshape(rnn_output, (batch_size, self.hidden_size, seq_len))
         #rnn_output = self.batch_norm(rnn_output)
