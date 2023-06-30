@@ -77,6 +77,9 @@ class rnn_model(torch.nn.Module):
             self.rnn.flatten_parameters()
         
         if self.model_type == "mha":        
+            _input = _input * math.sqrt(self.hidden_size)
+            _input = self.pos_encoder(_input)
+            
             curr_mask = torch.ones((seq_len,seq_len), dtype=torch.bool, device=_input.device)
             curr_mask = torch.triu(curr_mask, diagonal=1)
             _device = _input.device
