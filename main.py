@@ -82,39 +82,23 @@ def train_model(n_model, args):
         lossfile.write(f'running time: {end_time - start_time}\n')    
     print(f'running time: {end_time - start_time}')
     
-def retrain(n_model, args):
-    checkpoint = torch.load(args.load_path)
-    n_model.model.load_state_dict(checkpoint['model_state_dict'])
-    device = torch.device("cuda:" + str(args.device[0]))
-    optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr)    
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+def test(n_model, args):
+    _device = torch.device("cuda:" + str(args.device[0]))     
+    checkpoint = torch.load(f"TensorCodec/trained model/{args.dataset}_r{args.rank}_h{args.hidden_size}.pt" , map_location = _device)
+    n_model.model.load_state_dict(checkpoint['model_state_dict'])          
+    n_model.perm_list = checkpoint['perm']     
+    for i in range(n_model.order):
+        n_model.inv_perm_list[i][n_model.perm_list[i]] = torch.arange(n_model.input_mat.dims[i], device=_device)
     
-    max_fit = -sys.float_info.max
-    n_model.model.train()
-    for epoch in range(checkpoint['epoch']+1, args.epoch):
-        optimizer.zero_grad()
-        prev_loss = n_model.L2_loss(True, args.batch_size)
-        opt_state_dict = copy.deepcopy(optimizer.state_dict())
-        prev_model = copy.deepcopy(n_model.model.state_dict())
-        optimizer.step()        
-        prev_fit = 1 - math.sqrt(prev_loss)/n_model.input_mat.norm   
-        
-        with open(args.save_path + ".txt", 'a') as lossfile:
-            lossfile.write(f'epoch:{epoch}, train loss: {prev_fit}\n')    
-            print(f'epoch:{epoch}, train loss: {prev_fit}\n')
-            
-        if max_fit < prev_fit:
-            max_fit = prev_fit
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': prev_model,
-                'optimizer_state_dict': opt_state_dict,
-                'loss': prev_loss
-            }, args.save_path + ".pt")            
+    n_model.model.eval()
+    with torch.no_grad():
+        curr_loss = n_model.L2_loss(False, args.batch_size)
+        print(f"saved loss: {checkpoint['loss']}, computed loss: {1 - math.sqrt(curr_loss) / n_model.input_mat.norm}")
+    
             
 # python TensorCodec/main.py train -d uber -de 0 1 2 3 -rk 7 -hs 9 -sp output/uber1_r7_h9 -e 5000 -lr 1e-1 -m gru -nb 100 -t 100 -b 8388608
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
-# python main.py test_perm -d absrob -de 0 1 2 3 -rk 5 -hs 10 
+# python main.py test -d action -de 0 1 2 3 -rk 6 -hs 8 
 if __name__ == '__main__':    
     parser = argparse.ArgumentParser()
     parser.add_argument('action', type=str, help='train')
@@ -161,11 +145,6 @@ if __name__ == '__main__':
         "-sp", "--save_path",
         action="store", default="./params/", type=str
     )
-    
-    parser.add_argument(
-        "-lp", "--load_path",
-        action="store", default="./params/", type=str
-    )
         
     parser.add_argument(
         "-hs", "--hidden_size",
@@ -187,16 +166,17 @@ if __name__ == '__main__':
     with open("TensorCodec/input_size/" + args.dataset + ".txt") as f:
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
-                
-    input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
+     
+    input_mat = _mat(input_size, "input/" + args.dataset + ".npy", args.device[0])        
+    #input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
     #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
     print("load finish")
     if args.action == "train":
         n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)
         train_model(n_model, args)
-    elif args.action == "retrain":
-        n_model = TensorCodec(input_mat, args.rank, m_list, n_list, args.hidden_size, args.device, args.model)        
-        retrain(n_model, args)        
+    elif args.action == "test":
+        n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)
+        test(n_model, args)        
     elif args.action == "test_perm":
         n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)      
         test_perm(n_model, args)      
