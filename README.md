@@ -40,7 +40,7 @@ This repository is the official implementation of TensorCodec: Compact Lossy Com
 ||action|airquality|uber|nyc|
 |-|-|-|-|-|
 |Fitness|0.65|0.648|0.669|0.558|
-|number of parameters of NTTD|1272|2065|1263|573|
+|Compressed Size (bytes)|11686|26031|11870|5227|
 
 ## Real-world datasets we used
 |Name|shape|Density|Source|Link|
