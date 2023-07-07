@@ -52,7 +52,7 @@ Training (compressing) and evaluating (decompressing) process are implemented in
   python TensorCodec/main.py train -d action -de 0 1 2 3 -rk 6 -hs 8 -sp output/action_r6_h8 -e 5000 -lr 1 -m lstm -nb 100 -t 100 -b 2097152
 
   # Evaluating
-  python TensorCodec/main.py test -lp 'TensorCodec/trained model/action_r6_h8.pt' -d action -de 0 1 2 3 -rk 6 -hs 8
+  python TensorCodec/main.py test -lp output/action_r6_h8 -d action -de 0 1 2 3 -rk 6 -hs 8
 ```
 
 ## Evaluating the trained model
