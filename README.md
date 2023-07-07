@@ -6,7 +6,25 @@ This repository is the official implementation of TensorCodec: Compact Lossy Com
 
 * The code should be run on the folder (`./`) which includes the `TensorCodec` folder. The dataset files should be located in `./input`.
 
-## Arguments for training and evaluation
+## Initializing the orders
+Initialization of the orders of the tensor is implemented in ```init_order.py```.
+
+### Positional argument
+* `-sp`, `--save_path`: path for saving the original tensor.
+* `-lp`, `--load_path`: path for saving the reordered tensor.
+
+### Example commands and results
+```
+  python TensorCodec/init_order.py -lp input/action_orig.npy -sp input/action.npy
+
+  order: 0, loss before: 2387.244534244066, loss after: 2387.244534244066
+  order: 1, loss before: 46618.97891356207, loss after: 7292.559081679066
+  order: 2, loss before: 20461.291436824664, loss after: 14315.363870162731
+  Total elapsed time: 8.323100328445435
+```
+
+## Running TensorCodec
+Training (compressing) and evaluating (decompressing) process are implemented in ```main.py```.
 ### Positional argument
 * `action`: `train` for compressing the matrix. `test` for checking the reconstruction loss of the trained model.
 * `-d`, `--dataset`: data to be compressed
@@ -14,17 +32,27 @@ This repository is the official implementation of TensorCodec: Compact Lossy Com
 ### Optional arguments (common)
 * `-de`, `--device`: GPU id(s) for execution.
 * `-rk`, `--rank`: rank of TT cores.
-* `-hs`, `--hidden_size`: hidden size of LSTM.
-
+* `-hs`, `--hidden_size`: size of the hidden dimension.
+* `-m`, `--model`: type of the model (gru, lstm, mha). The default is lstm.
+* `-nb`, `--num_batch`: the number of mini-batches for training.
+* `-b`, `--batch_size`: the number of entries of the tensor which are processed simultaneosly in GPUs.
+  
 ### Optional arguments (for training)
 * `-lr`, `--lr`: learning rate.
 * `-e`, `--epoch`: maximum epoch numbers.
-* `-b', `--batch_size`: number of entries of tensors parallelly processed by GPU when computing the loss.
-* `-nb`, `--num_batch`: the number of mini-batches used to compress a tensor (train a model).
 * `-sp`, `--save_path`: path for saving the parameters of the trained model and the new orders of the indices of the tensor (bijective function from indices of the reordered tensor to the indices of the original tensor).
 * `-tol`, `--tol`: tolerance for training.
+ 
+### Example command
+```
+  # Training
+  python TensorCodec/main.py train -d action -de 0 1 2 3 -rk 6 -hs 8 -sp output/action_r6_h8 -e 5000 -lr 1 -m lstm -nb 100 -t 100 -b 2097152
 
-## Reproduction of results
+  # Evaluating
+  python TensorCodec/main.py test -d action -de 0 1 2 3 -rk 6 -hs 8
+```
+
+## Evaluating the trained model
 ### Command
 * We uploaded the trained model for the 3 smallest tensors among 3-order tensors and the smallest tensor among 4-order tensors in the folder 'trained model'.
 * The hyperparameters (rank and hidden dimension) correspond to the models with the fewest parameters shown in Figure 3 of the main paper for all datasets.
