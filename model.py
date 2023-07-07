@@ -261,8 +261,10 @@ class TensorCodec:
             self.input_size[i] = torch.tensor(self.input_size[i], dtype=torch.long, device=self.i_device)  # order x k    
             self.bases_list[i] = torch.tensor(self.bases_list[i], dtype=torch.long, device=self.i_device)  # order x k
         self._add = torch.tensor(self._add, dtype=torch.long, device=self.i_device).unsqueeze(0)                
-        self.num_params =  sum(p.numel() for p in self.model.parameters() if p.requires_grad)        
-        print(f"The number of params:{self.num_params}")
+        self.comp_size =  sum(p.numel() for p in self.model.parameters() if p.requires_grad) * 8
+        for i in range(self.order):
+            self.comp_size += math.ceil(self.input_mat.src_dims[i] * math.ceil(math.log(self.input_mat.src_dims[i], 2)) / 8)
+        print(f"Compressed size:{self.comp_size} bytes")
         # model -> matrix
         self.perm_list = [torch.tensor(list(range(self.input_mat.dims[i])), dtype=torch.long, device=self.i_device) for i in range(self.order)]
         # matrix -> model
