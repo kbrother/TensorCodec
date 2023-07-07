@@ -37,19 +37,22 @@ Training (compressing) and evaluating (decompressing) process are implemented in
 * `-nb`, `--num_batch`: the number of mini-batches for training.
 * `-b`, `--batch_size`: the number of entries of the tensor which are processed simultaneosly in GPUs.
   
-### Optional arguments (for training)
+### Optional arguments for training
 * `-lr`, `--lr`: learning rate.
 * `-e`, `--epoch`: maximum epoch numbers.
 * `-sp`, `--save_path`: path for saving the parameters of the trained model and the new orders of the indices of the tensor (bijective function from indices of the reordered tensor to the indices of the original tensor).
 * `-tol`, `--tol`: tolerance for training.
- 
+
+### Optional argument for evaluating
+* `-lp`, `--load_path`: path for loading the parameters of the trained model and the orders of the indices of the tensor.
+  
 ### Example command
 ```
   # Training
   python TensorCodec/main.py train -d action -de 0 1 2 3 -rk 6 -hs 8 -sp output/action_r6_h8 -e 5000 -lr 1 -m lstm -nb 100 -t 100 -b 2097152
 
   # Evaluating
-  python TensorCodec/main.py test -d action -de 0 1 2 3 -rk 6 -hs 8
+  python TensorCodec/main.py test -lp 'TensorCodec/trained model/action_r6_h8.pt' -d action -de 0 1 2 3 -rk 6 -hs 8
 ```
 
 ## Evaluating the trained model
@@ -58,10 +61,10 @@ Training (compressing) and evaluating (decompressing) process are implemented in
 * The hyperparameters (rank and hidden dimension) correspond to the models with the fewest parameters shown in Figure 3 of the main paper for all datasets.
 * You can run the code with the following commands. Note that the device option should be changed depending on the available GPUs.
 ```
-  python TensorCodec/main.py test -d action -de 0 1 2 3 -rk 6 -hs 8
-  python TensorCodec/main.py test -d airquality -de 0 1 2 3 -rk 7 -hs 11 
-  python TensorCodec/main.py test -d uber -de 0 1 2 3 -rk 8 -hs 7
-  python TensorCodec/main.py test -d nyc -de 0 1 2 3 -rk 2 -hs 5
+  python TensorCodec/main.py test -d action -lp 'TensorCodec/trained model/action_r6_h8.pt' -de 0 1 2 3 -rk 6 -hs 8
+  python TensorCodec/main.py test -d airquality -lp 'TensorCodec/trained model/airquality_r7_h11.pt' -de 0 1 2 3 -rk 7 -hs 11 
+  python TensorCodec/main.py test -d uber -lp 'TensorCodec/trained model/uber_r8_h7.pt' -de 0 1 2 3 -rk 8 -hs 7
+  python TensorCodec/main.py test -d nyc -lp 'TensorCodec/trained model/nyc_r2_h5.pt' -de 0 1 2 3 -rk 2 -hs 5
 ```
 
 ### Expected results
