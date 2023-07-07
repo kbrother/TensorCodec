@@ -84,7 +84,7 @@ def train_model(n_model, args):
     
 def test(n_model, args):
     _device = torch.device("cuda:" + str(args.device[0]))     
-    checkpoint = torch.load(f"TensorCodec/trained model/{args.dataset}_r{args.rank}_h{args.hidden_size}.pt" , map_location = _device)
+    checkpoint = torch.load(args.load_path , map_location = _device)
     n_model.model.load_state_dict(checkpoint['model_state_dict'])          
     n_model.perm_list = checkpoint['perm']     
     for i in range(n_model.order):
@@ -143,6 +143,11 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-sp", "--save_path",
+        action="store", default="./params/", type=str
+    )
+    
+    parser.add_argument(
+        "-lp", "--load_path",
         action="store", default="./params/", type=str
     )
         
