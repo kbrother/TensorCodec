@@ -45,11 +45,11 @@ This repository is the official implementation of TensorCodec: Compact Lossy Com
 ## Real-world datasets we used
 |Name|shape|Density|Source|Link|
 |-|-|-|-|-|
-|Uber|183 x 24 x 1,140|0.138|[FROSTT](http://frostt.io/)|[Link](https://www.dropbox.com/s/cvf6nrkmmwfe00w/uber_orig.npy?dl=0)|
-|Air Quality|5,600 x 362 x 6|0.917|[Air Korea](https://www.airkorea.or.kr/web/)|[Link](https://www.dropbox.com/s/0a6ys590taefj8t/airquality_orig.npy?dl=0)|
-|Action|100 x 570 x 567|0.393|[Multivariate LSTM-FCNs](https://github.com/titu1994/MLSTM-FCN)|[Link](https://www.dropbox.com/s/q1fpw14tjpxfa0x/action_orig.npy?dl=0)|
-|PEMS-SF|963 X 144 X 440|0.999|[The UEA & UCR Time Series Classification Repository](https://www.timeseriesclassification.com/)|[Link](https://www.dropbox.com/s/n4kj8ajw9j8mefa/pems_orig.npy?dl=0)|
-|Activity|337 x 570 x 320|0.569|[Multivariate LSTM-FCNs](https://github.com/titu1994/MLSTM-FCN)|[Link](https://www.dropbox.com/s/muoyj7a1utajhs9/activity_orig.npy?dl=0)|
-|Stock|1,317 x 88 x 916|0.816|[Zoom-Tucker](https://github.com/jungijang/KoreaStockData)|[Link](https://www.dropbox.com/s/kpesk1nn0a92lrq/kstock_orig.npy?dl=0)|
-|NYC|265 X 265 X 28 X 35|0.118|[New York City Government](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)|[Link](https://www.dropbox.com/s/9n9llimrxvyln76/nyc_orig.npy?dl=0)|
-|Absorb|192 x 228 x 30 x 120|1.000|[Climate Data at the National Center for Atmospheric Research](https://www.earthsystemgrid.org)|[Link](https://www.dropbox.com/s/wpmyt5wt5ca08i5/absorb_orig.npy?dl=0)|
+|Uber|183 x 24 x 1,140|0.138|[FROSTT](http://frostt.io/)|[Link](https://www.dropbox.com/sh/n1wv6sad7pdtvs2/AABo7r1d42btdmfkyf46FTNOa?dl=0)|
+|Air Quality|5,600 x 362 x 6|0.917|[Air Korea](https://www.airkorea.or.kr/web/)|[Link](https://www.dropbox.com/sh/mph9ynz21dbjplc/AACnfvEWNC2V3vAKKB5d__Bga?dl=0)|
+|Action|100 x 570 x 567|0.393|[Multivariate LSTM-FCNs](https://github.com/titu1994/MLSTM-FCN)|[Link](https://www.dropbox.com/sh/vz4dw1a1hu5i2d3/AAA18RxIZbYZKkqPEQxJRq7da?dl=0)|
+|PEMS-SF|963 X 144 X 440|0.999|[The UEA & UCR Time Series Classification Repository](https://www.timeseriesclassification.com/)|[Link](https://www.dropbox.com/sh/ps0wiyrsjhfvbas/AACX_JYd4skwFcS4dYs20aiJa?dl=0)|
+|Activity|337 x 570 x 320|0.569|[Multivariate LSTM-FCNs](https://github.com/titu1994/MLSTM-FCN)|[Link](https://www.dropbox.com/sh/4rsd4gp9em4vz8i/AABfjRdCkpAR8HSpjwRJgvkfa?dl=0)|
+|Stock|1,317 x 88 x 916|0.816|[Zoom-Tucker](https://github.com/jungijang/KoreaStockData)|[Link](https://www.dropbox.com/sh/m812qgv1t5zjris/AAAxTz-fVItQbsLBhlGVJiRGa?dl=0)|
+|NYC|265 X 265 X 28 X 35|0.118|[New York City Government](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)|[Link](https://www.dropbox.com/sh/bv2rrj6gp73z7sr/AACM2ZIvm8Bg3RuyY2mlObMia?dl=0)|
+|Absorb|192 x 228 x 30 x 120|1.000|[Climate Data at the National Center for Atmospheric Research](https://www.earthsystemgrid.org)|[Link](https://www.dropbox.com/sh/5k9du01d1yvgnke/AAANN2QL0KxAmM3rRdH_yt82a?dl=0)|
