@@ -30,7 +30,7 @@ def train_model(n_model, args):
     minibatch_size = n_model.input_mat.real_num_entries // args.num_batch
     
     with open(args.save_path + ".txt", 'a') as lossfile:
-        lossfile.write(f'num params: {n_model.num_params}\n')    
+        lossfile.write(f'compressed size: {n_model.comp_size} bytes\n')    
         
     tol_count = 0
     start_time = time.time()
