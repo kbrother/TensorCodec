@@ -73,8 +73,8 @@ def train_model(n_model, args):
                 }, args.save_path + ".pt")
             
         with open(args.save_path + ".txt", 'a') as lossfile:
-            lossfile.write(f'epoch:{epoch}, train loss: {curr_fit}\n')    
-            print(f'epoch:{epoch}, train loss: {curr_fit}\n')                        
+            lossfile.write(f'epoch:{epoch}, current fitness: {curr_fit}\n')    
+            print(f'epoch:{epoch}, current fitness: {curr_fit}\n')                        
         if tol_count >= args.tol: break
     
     end_time = time.time()
