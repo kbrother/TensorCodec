@@ -138,7 +138,7 @@ if __name__ == '__main__':
     
     parser.add_argument(
         "-nb", "--num_batch",
-        action="store", default=20, type=int
+        action="store", default=100, type=int
     )
     
     parser.add_argument(
