@@ -1,5 +1,5 @@
 # TensorCodec: Compact Lossy Compression of Tensors without Strong Data Assumptions
-This repository is the official implementation of [TensorCodec: Compact Lossy Compression of Tensors without Strong Data Assumptions](https://arxiv.org/abs/2309.10310), Taehyung Kwon, Jihoon Ko, Jinghong jung, and Kijung Shin, ICDM 2023 (to appear)
+This repository is the official implementation of [TensorCodec: Compact Lossy Compression of Tensors without Strong Data Assumptions](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10415668), Taehyung Kwon, Jihoon Ko, Jinghong jung, and Kijung Shin, ICDM 2023
 
 ## Requirements
 * To run the provided codes, you need to install `PyTorch`. Since the installation commands for the package rely on the environments, please visit the page (https://pytorch.org/get-started/locally/) for guideline to install the package.
