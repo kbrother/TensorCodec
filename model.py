@@ -309,6 +309,25 @@ class TensorCodec:
         #print(f'root val sum: {math.sqrt(val_sum)}, loss:{math.sqrt(return_loss)}, pred sum:{pred_sum}')
         return return_loss    
     
+    
+    def dump(self, batch_size):
+        return_loss = 0.
+        output_tensor = np.zeros(self.input_mat.real_num_entries)
+        for i in tqdm(range(0, self.input_mat.real_num_entries, batch_size)):
+            with torch.no_grad():
+                curr_batch_size = min(batch_size, self.input_mat.real_num_entries - i)
+                curr_ten_idx = torch.arange(i, i + curr_batch_size, dtype=torch.long, device = self.i_device)
+                curr_ten_idx = curr_ten_idx.unsqueeze(-1) // self.input_mat.src_base % self.input_mat.src_dims_gpu # batch size x order      
+                curr_model_idx = curr_ten_idx.clone()
+                for j in range(self.order):
+                    curr_model_idx[:, j] = self.inv_perm_list[j][curr_ten_idx[:, j]]
+                            
+            preds = self.predict(curr_model_idx)               
+            output_tensor[i:i+curr_batch_size] = preds.cpu().numpy()
+        
+        return output_tensor.reshape(self.input_mat.src_dims)
+    
+    
     def entry_sum(self, batch_size):
         return_val = 0.        
         self.model_dims = []

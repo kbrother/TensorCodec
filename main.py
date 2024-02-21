@@ -94,7 +94,8 @@ def test(n_model, args):
     with torch.no_grad():
         curr_loss = n_model.L2_loss(False, args.batch_size)
         print(f"saved loss: {checkpoint['loss']}, computed loss: {1 - math.sqrt(curr_loss) / n_model.input_mat.norm}")
-    
+        output_tensor = n_model.dump(args.batch_size)
+        np.save(args.save_path, output_tensor)
             
 # python TensorCodec/main.py train -d uber -de 0 1 2 3 -rk 7 -hs 9 -sp output/uber1_r7_h9 -e 5000 -lr 1e-1 -m gru -nb 100 -t 100 -b 8388608
 # python main.py check_sum -d uber -de 0 1 2 3 -rk 5 -hs 10 
