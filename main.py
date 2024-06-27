@@ -33,8 +33,9 @@ def train_model(n_model, args):
         lossfile.write(f'compressed size: {n_model.comp_size} bytes\n')    
         
     tol_count = 0
-    start_time = time.time()
+    time_check = 0
     for epoch in range(args.epoch): 
+        start_time = time.time()
         optimizer = torch.optim.Adam(n_model.model.parameters(), lr=args.lr/args.num_batch) 
         n_model.model.train()               
         curr_order = np.random.permutation(n_model.input_mat.real_num_entries)            
@@ -46,41 +47,20 @@ def train_model(n_model, args):
             
             optimizer.zero_grad()
             mini_loss, mini_norm = n_model.L2_minibatch_loss(True, args.batch_size, samples)
-            optimizer.step() 
+            optimizer.step()         
         
         n_model.model.eval()
         for _dim in range(n_model.order):
-            n_model.change_permutation(args.batch_size, _dim)
-                        
-        with torch.no_grad():
-            n_model.model.eval()
-            curr_loss = n_model.L2_loss(False, args.batch_size)
-            curr_fit = 1 - math.sqrt(curr_loss)/n_model.input_mat.norm
-            
-            if prev_fit + 1e-4 <= curr_fit: 
-                tol_count = 0
-                prev_fit = curr_fit
-            else: tol_count += 1
-                
-            if max_fit < curr_fit:
-                max_fit = curr_fit                
-                prev_model = copy.deepcopy(n_model.model.state_dict())
-                torch.save({
-                    'epoch': epoch,
-                    'model_state_dict': prev_model,                    
-                    'loss': curr_fit,
-                    'perm': n_model.perm_list
-                }, args.save_path + ".pt")
-            
-        with open(args.save_path + ".txt", 'a') as lossfile:
-            lossfile.write(f'epoch:{epoch}, current fitness: {curr_fit}\n')    
-            print(f'epoch:{epoch}, current fitness: {curr_fit}\n')                        
-        if tol_count >= args.tol: break
+            n_model.change_permutation(args.batch_size, _dim)                
+        
+        if epoch > 1:
+            time_check += (time.time() - start_time)
     
-    end_time = time.time()
+    time_check /= (args.epoch - 1)
     with open(args.save_path + ".txt", 'a') as lossfile:
-        lossfile.write(f'running time: {end_time - start_time}\n')    
-    print(f'running time: {end_time - start_time}')
+        lossfile.write(f'running time: {time_check}\n')    
+    print(f'running time: {time_check}')
+    
     
 def test(n_model, args):
     _device = torch.device("cuda:" + str(args.device[0]))     
@@ -173,9 +153,7 @@ if __name__ == '__main__':
         lines = f.read().split("\n")
         input_size = [[int(word) for word in line.split()] for line in lines if line]        
      
-    input_mat = _mat(input_size, "input/" + args.dataset + ".npy", args.device[0])        
-    #input_mat = _mat(input_size, "input/23-NeuTT/" + args.dataset + ".npy", args.device[0])        
-    #input_mat = _mat(input_size, "data/" + args.dataset + ".npy", args.device[0])        
+    input_mat = _mat(input_size, args.device[0])            
     print("load finish")
     if args.action == "train":
         n_model = TensorCodec(input_mat, args.rank, input_size, args.hidden_size, args.device, args.model)

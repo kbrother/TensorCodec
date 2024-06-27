@@ -8,14 +8,14 @@ class _mat:
         input_size: order x k
         dims: dimensions with padded size, size is order
     '''
-    def __init__(self, input_size, data_name, device):                
-        self.src_tensor = np.load(data_name)
-        print(self.src_tensor.shape)
+    def __init__(self, input_size, device):             
+        self.order = len(input_size)
+        self.dims = [int(np.prod(np.array(input_size[i]))) for i in range(self.order)]
+        self.src_tensor = np.random.rand(*self.dims)
         if self.src_tensor.dtype != "float64":
             self.src_tensor = self.src_tensor.astype(np.float64)
         self.src_dims = list(np.shape(self.src_tensor))                            
-        self.order = len(self.src_dims)
-        self.dims = [int(np.prod(np.array(input_size[i]))) for i in range(self.order)]
+        print(self.src_dims)
         
         self.src_vals = self.src_tensor.flatten()    
         self.real_num_entries = len(self.src_vals)        
